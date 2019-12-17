@@ -12,6 +12,22 @@ import srt_utils.process as process
 logger = logging.getLogger(__name__)
 
 
+SSH_CONNECTION_TIMEOUT = 10
+# NOTE: It is important to add "-t" option in order for SSH 
+# to transfer SIGINT, SIGTERM signals to the command
+# NOTE: It is important to add "-o BatchMode=yes" option 
+# in order to disable any kind of promt
+# NOTE: It is important to add # "-o ConnectTimeout={SSH_CONNECTION_TIMEOUT}"
+# option in case when the server is down not to wait and be able to check 
+# quickly that the process has not been started successfully
+SSH_COMMON_ARGS = [
+    'ssh', 
+    '-t',
+    '-o', 'BatchMode=yes',
+    '-o', f'ConnectTimeout={SSH_CONNECTION_TIMEOUT}',
+]
+
+
 class IObjectRunner(ABC):
     @staticmethod
     @abstractmethod
@@ -153,8 +169,19 @@ class RemoteProcess(IObjectRunner):
         self.username = username
         self.host = host
 
-        self.process = None
+        args = []
+        args += SSH_COMMON_ARGS
+        args += [f'{self.username}@{self.host}']
+        obj_args = [f'"{arg}"'for arg in self.obj.make_args()]
+        args += obj_args
+        print(args)
+
+        self.runner = process.Process(args, True)
         self.is_started = False
+
+        # TODO: ?
+        # self.dirpath - directory where to collect results
+
 
     @staticmethod
     def _create_directory(dirpath: str, username: str, host: str):
@@ -195,6 +222,7 @@ class RemoteProcess(IObjectRunner):
 
         logger.info(f'Created successfully')
 
+
     @classmethod
     def from_config(cls, obj: objects.IObject, config: dict):
         # obj - object (app, hublet) to run
@@ -207,53 +235,107 @@ class RemoteProcess(IObjectRunner):
         """
         return cls(obj, config['username'], config['host'])
 
+
     def start(self):
+        # TODO: This function is almost the same as for LocalProcess class
+        # except some logger info and create_dir function args
         logger.info(f'Starting remotely via SSH: {self.obj}')
 
         if self.is_started:
-            raise ValueError(f'Process has been started already: {self.obj}, {self.process}')
+            raise ValueError(
+                f'Process has been started already: {self.obj}. '
+                f'Start can not be done'
+            )
 
         if self.obj.dirpath != None:
             self._create_directory(self.obj.dirpath, self.username, self.host)
 
-        args = []
-        args += shared.SSH_COMMON_ARGS
-        args += [f'{self.username}@{self.host}']
-        obj_args = [f'"{arg}"'for arg in self.obj.make_args()]
-        args += obj_args
+        try:
+            self.runner.start()
+        except (ValueError, process.ProcessNotStarted):
+            logger.error(f'Failed to start: {self.obj}', exc_info=True)
+            raise
         
-        self.process = shared.create_process(args, True)
         self.is_started = True
 
-        logger.info(f'Started successfully: {self.obj}, {self.process}')
+        logger.info(f'Started successfully: {self.obj}, {self.runner}')
+
 
     def stop(self):
-        # TODO: use get_status method in order to check whether the process is running or not
-        # instead of currently implemented logic in cleanup_process
-        # TODO: change cleanup function to have only one input - process
-        logger.info(f'Stopping remotely via SSH: {self.obj}, {self.process}')
+        # TODO: Almost the same function
+
+        logger.info(f'Stopping remotely via SSH: {self.obj}, {self.runner}')
 
         if not self.is_started:
-            raise ValueError(f'Process has not been started yet: {self.obj}')
+            raise ValueError(
+                f'Process has not been started yet: {self.obj}. '
+                f'Stop can not be done'
+            )
 
-        shared.cleanup_process((self.obj, self.process))
-        logger.info(f'Stopped successfully: {self.obj}, {self.process}')
+        try:
+            self.runner.stop()
+        except (ValueError, process.ProcessNotStopped):
+            logger.error(f'Failed to stop: {self.obj}, {self.runner}', exc_info=True)
+            raise
+        
+        logger.info(f'Stopped successfully: {self.obj}, {self.runner}')
+
 
     def get_status(self):
-        # TODO: Adapt process_is_running()
-        pass
+        # TODO: The same function
+
+        logger.info(f'Getting status: {self.obj}, {self.runner}')
+
+        if not self.is_started:
+            raise ValueError(
+                f'Process has not been started yet: {self.obj}. '
+                f'Can not get status'
+            )
+
+        status, _ = self.runner.get_status()
+        return status
+
 
     def collect_results(self):
-        logger.info('Collecting results')
+        logger.info(f'Collecting results: {self.obj}, {self.runner}')
         
         if not self.is_started:
-            raise ValueError(f'Process has not been started yet: {self.obj}')
+            raise ValueError(
+                f'Process has not been started yet: {self.obj}. '
+                f'Can not collect results.'
+            )
 
+        stdout, stderr = self.runner.collect_results()
+        # TODO: Implement writing stderr, stdout in files (logs folder)
+        print(f'stdout: {stdout}')
+        print(f'stderr: {stderr}')
+
+        # ? or dirpath is None - there can be multiple files
         if self.obj.filepath is None:
             return
 
+        print(self.obj.dirpath)
+        print(self.obj.filepath)
+
+        # Create directory on the local machine
+        # TODO: redundant code
+        dirpath = pathlib.Path(f'{self.username}@{self.host}')
+        print(dirpath)
+        logger.info(f'Creating a directory for loading the results: {dirpath}')
+        if dirpath.exists():
+            logger.info('Directory already exists, no need to create')
+            # return
+        else:
+            dirpath.mkdir(parents=True)
+            logger.info('Created successfully')
+
         with fabric.Connection(host=self.host, user=self.username) as c:
-            result = c.get(self.obj.filepath)
+            # the folder tmp_5 should be there
+            # result = c.get(self.obj.filepath, '/Users/msharabayko/projects/srt/lib-srt-utils/tmp_5/uhu.pcapng')
+            # result = c.get(self.obj.filepath, 'tmp_5/olala.pcapng')
+            result = c.get(self.obj.filepath, f'{dirpath}/olala.pcapng')
+            print(result)
+
             # TODO: Implement
             # http://docs.fabfile.org/en/1.14/api/core/operations.html
             # http://docs.fabfile.org/en/2.3/api/transfer.html
@@ -265,3 +347,5 @@ class RemoteProcess(IObjectRunner):
         # TODO: Implement
         # exit code, stdout, stderr, files
         # download files via scp for SSHSubprocess
+
+        logger.info('Collected successfully')
