@@ -128,13 +128,7 @@ def create_experiment_config(stop_after: int, collect_results_path: str, ignore_
     return config
 
 
-if __name__ == '__main__':
-
-    logging.basicConfig(
-        level=logging.INFO,
-        format='%(asctime)-15s [%(levelname)s] %(message)s',
-    )
-
+def previous_main():
     factory = runners.SimpleFactory()
 
     # time to stream
@@ -168,9 +162,27 @@ if __name__ == '__main__':
         obj_runner.collect_results()
 
 
-    # exp_runner = SingleExperimentRunner(factory, config)
-    # exp_runner.start()
-    # logger.info(f'Sleeping {stop_after} s ...')
-    # time.sleep(stop_after)
-    # exp_runner.stop()
+if __name__ == '__main__':
+
+    logging.basicConfig(
+        level=logging.INFO,
+        format='%(asctime)-15s [%(levelname)s] %(message)s',
+    )
+
+    # time to stream
+    stop_after = 20
+    # TODO: Make an option
+    collect_results_path = '_results_exp'
+    # This will be changed to loading the config from file
+    # and then adjusting it (srt parameters, etc.) knowing what kind of
+    # experiment we are going to do. Or we will provide a cli to user with
+    # the list of parameters we need to know (or it would be just a file with the list of params),
+    # and then config file for the experiment will be built in a function and parameters will be adjusted
+    config = create_experiment_config(stop_after, collect_results_path)
+
+    exp_runner = runners.SingleExperimentRunner(config)
+    exp_runner.start()
+    logger.info(f'Sleeping {stop_after} s ...')
+    time.sleep(stop_after)
+    exp_runner.stop()
     # exp_runner.collect_results()

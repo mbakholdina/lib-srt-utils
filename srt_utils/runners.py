@@ -1,5 +1,16 @@
+import logging
+import pathlib
+import time
+
 import srt_utils.objects as objects
 import srt_utils.object_runners as object_runners
+
+
+logger = logging.getLogger(__name__)
+
+
+class DirectoryExists(Exception):
+    pass
 
 
 ### Simple Factory ###
@@ -31,60 +42,142 @@ class SimpleFactory:
         return runner
 
 
+# TODO: Use attrs here
+class Task:
+
+    def __init__(self, name: str, obj: objects.IObject, obj_runner: object_runners.IObjectRunner, config: dict):
+        # TODO: Check config for validity
+        self.name = name
+        self.obj = obj
+        self.obj_runner = obj_runner
+        self.sleep_after_start = config['sleep_after_start']
+        self.sleep_after_stop = config['sleep_after_stop']
+        self.stop_order = config['stop_order']
+
+
 ### ITestRunner -> SingleExperimentRunner, TestRunner, CombinedTestRunner ###
 # The methods will be similar to IRunner
 
 class SingleExperimentRunner:
 
-    def __init__(self, factory: SimpleFactory, config: dict):
-        self.factory = factory
+    def __init__(self, config: dict):
+        self.factory = SimpleFactory()
+        # TODO: Check config for validaty - use some json tools: 
+        # tasks should have unique keys, there should be at least one task defined,
+        # etc. Raise exception in case of problems.
         self.config = config
 
         # TODO: Add attributes from config
-        # self.collect_results_path
+        self.collect_results_path = pathlib.Path(self.config['collect_results_path'])
+        self.ignore_stop_order = self.config['ignore_stop_order']
 
         # TODO: Create a class for task: obj, obj_runner, sleep_after_stop, stop_order
         self.tasks = []
+
+        for task_key, task_config in self.config['tasks'].items():
+            print(task_key)
+            name = 'task-' + task_key
+            obj = self.factory.create_object(task_config['obj_type'], task_config['obj_config'])
+            obj_runner = self.factory.create_runner(obj, task_config['runner_type'], task_config['runner_config'])
+            self.tasks += [Task(name, obj, obj_runner, task_config)]
+
         self.is_started = False
 
-    # TODO: create_directory
-    # create - self.collect_results_path
-    # but if this dir already exists from the previous run - stop the expirement and ask user to use the other nam
-    # delete the directory is not good, cause the results of the previous run might be needed
+
+    @staticmethod
+    def _create_directory(dirpath: pathlib.Path):
+        """
+        Raises:
+            DirectoryExists
+        """
+        # but if this dir already exists from the previous run - stop the expirement and ask user to use the other nam
+        # delete the directory is not good, cause the results of the previous run might be needed
+        logger.info(f'Creating a directory for saving experiment results: {dirpath}')
+        if dirpath.exists():
+            logger.error(
+                'Directory already exists, please use non-existing directory '
+                'name and start the experiment again. Existing directory '
+                'contents will not be changed.'
+                )
+            raise DirectoryExists(dirpath)
+
+        dirpath.mkdir(parents=True)
+        logger.info('Created successfully')
+
+
+    @classmethod
+    def from_config(cls, obj: objects.IObject, config: dict):
+        return cls(obj, config)
+
 
     def start(self):
+        """
+        Raises:
+            ValueError
+            DirectoryExists
+        """
         logger.info('[SingleExperimentRunner] Starting experiment')
 
         if self.is_started:
-            raise ValueError(f'Experiment has been started already')
+            raise ValueError(
+                f'Experiment has been started already. '
+                f'Start can not be done.'
+            )
 
-        for task, task_config in self.config['tasks'].items():
-            obj = self.factory.create_object(task_config['obj_type'], task_config['obj_config'])
-            obj_runner = self.factory.create_runner(obj, task_config['runner_type'], task_config['runner_config'])
-            obj_runner.start()
-            obj_runner.get_status()
-            self.tasks += [(obj, obj_runner, task_config['sleep_after_stop'], task_config['stop_order'])]
-            if task_config['sleep_after_start'] is not None:
-                logger.info(f"[SingleExperimentRunner] Sleeping {task_config['sleep_after_start']} s")
-                time.sleep(task_config['sleep_after_start'])
+        # Create directory for saving experiment results
+        try:
+            self._create_directory(self.collect_results_path)
+        except DirectoryExists:
+            raise
+
+        # Start tasks
+        print(self.tasks)
+
+        # TODO: Catch exceptions, if something has not started, we should do clean up
+        for task in self.tasks:
+            logging.info(f'Starting task: {task.name}')
+            task.obj_runner.start()
+            task.obj_runner.get_status()
+            sleep_after_start = task.sleep_after_start
+            
+            if sleep_after_start is not None:
+                logger.info(f"[SingleExperimentRunner] Sleeping {sleep_after_start} s after task start")
+                time.sleep(sleep_after_start)
+
+            logging.info('Task - Started successfully')
 
         self.is_started = True
-            
+
+        logging.info('Experiment - Started successfully')
+
+
     def stop(self):
         logger.info('[SingleExperimentRunner] Stopping experiment')
 
         if not self.is_started:
-            raise ValueError(f'Experiment has not been started yet')
+            raise ValueError(
+                f'Experiment has not been started yet. '
+                f'Stop can not be done.'
+            )
 
-        # TODO: Stop the tasks in reverse order
-        if self.config['ignore_stop_order']:
-            for _, obj_runner, sleep_after_stop, _ in self.tasks:
-                obj_runner.stop()
+        # Stop the tasks in reverse order
+        # TODO: Catch exceptions, clean up
+        if self.ignore_stop_order:
+            for task in self.tasks:
+                sleep_after_stop = task.sleep_after_stop
+
+                logging.info(f'Stopping task: {task.name}')
+                task.obj_runner.stop()
+
                 if sleep_after_stop is not None:
                     logger.info(f"[SingleExperimentRunner] Sleeping {sleep_after_stop}s ...")
                     time.sleep(sleep_after_stop)
 
+                logging.info('Task - Stopped successfully')
+
         # TODO: Implement stopping tasks according to the specified stop order
+        
+        logger.info('Experiment - Stopped successfully')
 
     def get_status(self):
         pass
