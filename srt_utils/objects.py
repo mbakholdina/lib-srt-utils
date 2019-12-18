@@ -83,6 +83,8 @@ class IObject(ABC):
         # specified, otherwise it's None.
         self.name = name
         self.dirpath = None
+        # Added here recently
+        self.filepath = None
 
     def __str__(self):
         return f'{self.name}'

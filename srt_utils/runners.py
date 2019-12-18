@@ -41,12 +41,16 @@ class SingleExperimentRunner:
         self.config = config
 
         # TODO: Add attributes from config
+        # self.collect_results_path
 
         # TODO: Create a class for task: obj, obj_runner, sleep_after_stop, stop_order
         self.tasks = []
         self.is_started = False
 
     # TODO: create_directory
+    # create - self.collect_results_path
+    # but if this dir already exists from the previous run - stop the expirement and ask user to use the other nam
+    # delete the directory is not good, cause the results of the previous run might be needed
 
     def start(self):
         logger.info('[SingleExperimentRunner] Starting experiment')

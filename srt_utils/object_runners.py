@@ -28,6 +28,16 @@ SSH_COMMON_ARGS = [
 ]
 
 
+def create_directory_internal(dirpath: pathlib.Path):
+    logger.info(f'Creating a directory for ...: {dirpath}')
+    if dirpath.exists():
+        logger.info('Directory already exists, no need to create')
+        return
+    
+    dirpath.mkdir(parents=True)
+    logger.info('Created successfully')
+
+
 class IObjectRunner(ABC):
     @staticmethod
     @abstractmethod
@@ -59,8 +69,9 @@ class IObjectRunner(ABC):
 class LocalProcess(IObjectRunner):
     """ TODO """
 
-    def __init__(self, obj: objects.IObject):
+    def __init__(self, obj: objects.IObject, collect_results_path: pathlib.Path=pathlib.Path('.')):
         self.obj = obj
+        self.collect_results_path = collect_results_path
         self.runner = process.Process(self.obj.make_args())
         self.is_started = False
 
@@ -76,7 +87,11 @@ class LocalProcess(IObjectRunner):
 
 
     @classmethod
-    def from_config(cls, obj: objects.IObject, config: dict=None):
+    def from_config(cls, obj: objects.IObject, config: dict={}):
+        if config:
+            collect_results_path = pathlib.Path(config['collect_results_path'])
+            return cls(obj, collect_results_path)
+
         return cls(obj)
 
 
@@ -157,6 +172,54 @@ class LocalProcess(IObjectRunner):
         # TODO: Implement writing stderr, stdout in files (logs folder)
         print(f'stdout: {stdout}')
         print(f'stderr: {stderr}')
+
+        if not self.collect_results_path.exists():
+            print('There was no directory for collecting results created, error')
+            # exception
+            # it's expected that this directory is already there and created from SingleExpRunner
+            return
+
+        # If an object has filepath defined, it means there should an output file
+        # however it does not mean that the file was created successfully
+        # that's why we check whether the filepath exists
+        if self.obj.filepath == None:
+            print('There was no output file expected, nothing to collect')
+            logger.info('Collected successfully')
+            return
+
+        if not self.obj.filepath.exists():
+            print('There was no output file created, error')
+            # it means that the object has not produce the file, probably because of some error
+            # in this case stdout, stderr of the process will be useful
+            # exception
+            return
+
+        # Create runner folder to copy the results - local - inside the self.collect_results_path dir
+        filename = self.obj.filepath.name
+        source = self.obj.filepath
+        destination_dir = self.collect_results_path / 'local'
+        destination = destination_dir / filename
+        print(f'destination: {destination}')
+
+        create_directory_internal(destination_dir)
+
+        # The code above will raise a FileExistsError if destination already exists. 
+        # Technically, this copies a file. To perform a move, simply delete source 
+        # after the copy is done (see below). Make sure no exception was raised though.
+
+        # In case we have several tasks which is runned locally and in case the tasks have the same name,
+        # the result might be overwritten. That's why we do not delite destination file before,
+        # we catch FileExistsError in this case. That's why it is necessary to make unique file names
+        # for different tasks
+        try:
+            with destination.open(mode='xb') as fid:
+                fid.write(source.read_bytes())
+        except FileExistsError:
+            print('The destination file already exists, there might be a file collected by the other task/obj')
+            print(f'File was not copied: {self.obj.filepath}')
+            # raise exception ?
+
+        # Delete source file (?), might be an option, but not necessary as a start
 
         logger.info('Collected successfully')
 

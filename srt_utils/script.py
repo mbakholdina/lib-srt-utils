@@ -32,12 +32,13 @@ def create_task_config(
     }
 
 
-def create_experiment_config(stop_after: int, ignore_stop_order: bool=True):
+def create_experiment_config(stop_after: int, collect_results_path: str, ignore_stop_order: bool=True):
     dirpath = '_results'
     sleep_after_start = 3
     sleep_after_stop = 1
 
     config = {}
+    config['collect_results_path'] = collect_results_path     # path where to collect results
     config['stop_after'] = stop_after
     config['ignore_stop_order'] = ignore_stop_order
 
@@ -45,16 +46,16 @@ def create_experiment_config(stop_after: int, ignore_stop_order: bool=True):
     tshark_config = {
         'interface': 'en0',
         'port': 4200,
-        'filepath': f'{dirpath}/dump.pcapng',
+        'filepath': f'{dirpath}_local/dump.pcapng',
     }
-    tshark_runner_config = None
-    # config['tasks']['0'] = create_task_config(
-    #     'tshark', 
-    #     tshark_config, 
-    #     'subprocess', 
-    #     tshark_runner_config,
-    #     sleep_after_start
-    # )
+    tshark_runner_config = {}
+    config['tasks']['0'] = create_task_config(
+        'tshark', 
+        tshark_config, 
+        'subprocess', 
+        tshark_runner_config,
+        sleep_after_start
+    )
 
     tshark_config = {
         'interface': 'eth0',
@@ -65,14 +66,14 @@ def create_experiment_config(stop_after: int, ignore_stop_order: bool=True):
         'username': 'msharabayko',
         'host': '137.116.228.51',
     }
-    config['tasks']['1'] = create_task_config(
-        'tshark', 
-        tshark_config, 
-        'ssh-subprocess', 
-        tshark_runner_config,
-        None,
-        sleep_after_stop
-    )
+    # config['tasks']['1'] = create_task_config(
+    #     'tshark', 
+    #     tshark_config, 
+    #     'ssh-subprocess', 
+    #     tshark_runner_config,
+    #     None,
+    #     sleep_after_stop
+    # )
 
     srt_test_msg_config = {
         'path': '/Users/msharabayko/projects/srt/srt-maxlovic/_build',
@@ -138,17 +139,23 @@ if __name__ == '__main__':
 
     # time to stream
     stop_after = 20
+    # TODO: Make an option
+    collect_results_path = '_results_exp'
     # This will be changed to loading the config from file
     # and then adjusting it (srt parameters, etc.) knowing what kind of
     # experiment we are going to do. Or we will provide a cli to user with
     # the list of parameters we need to know (or it would be just a file with the list of params),
     # and then config file for the experiment will be built in a function and parameters will be adjusted
-    config = create_experiment_config(stop_after)
+    config = create_experiment_config(stop_after, collect_results_path)
 
     for task, task_config in config['tasks'].items():
         obj = factory.create_object(task_config['obj_type'], task_config['obj_config'])
-        print(obj.make_args())
-        obj_runner = factory.create_runner(obj, task_config['runner_type'], task_config['runner_config'])
+        # print(obj.make_args())
+        runner_config = task_config['runner_config']
+        print(runner_config)
+        runner_config['collect_results_path'] = collect_results_path
+        print(runner_config)
+        obj_runner = factory.create_runner(obj, task_config['runner_type'], runner_config)
 
         obj_runner.start()
         obj_runner.get_status()
