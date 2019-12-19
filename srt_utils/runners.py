@@ -96,7 +96,7 @@ class SingleExperimentRunner:
         """
         # but if this dir already exists from the previous run - stop the expirement and ask user to use the other nam
         # delete the directory is not good, cause the results of the previous run might be needed
-        logger.info(f'[{classname}] Creating a directory for saving experiment results: {dirpath}')
+        logger.info(f'[{classname}] Creating a local directory for saving experiment results: {dirpath}')
         if dirpath.exists():
             logger.error(
                 'Directory already exists, please use non-existing directory '
@@ -104,13 +104,13 @@ class SingleExperimentRunner:
                 'contents will not be changed.'
                 )
             raise DirectoryExists(dirpath)
-
         dirpath.mkdir(parents=True)
-        logger.info(f'[{classname}] Created successfully')
+        # logger.info(f'[{classname}] Created successfully')
 
 
     @classmethod
     def from_config(cls, obj: objects.IObject, config: dict):
+        # TODO: Config example
         return cls(obj, config)
 
 
@@ -119,6 +119,7 @@ class SingleExperimentRunner:
         Raises:
             ValueError
             DirectoryExists
+            process.ProcessNotStarted
         """
         logger.info(f'[{self.__class__.__name__}] Starting experiment')
 
@@ -128,34 +129,40 @@ class SingleExperimentRunner:
                 f'Start can not be done.'
             )
 
-        # Create directory for saving experiment results
+        # Create a directory for saving experiment results
         try:
             self._create_directory(self.collect_results_path, self.__class__.__name__)
         except DirectoryExists:
             raise
 
         # Start tasks
-        print(self.tasks)
-
-        # TODO: Catch exceptions, if something has not started, we should do clean up
         for task in self.tasks:
             logging.info(f'[{self.__class__.__name__}] Starting task: {task.name}, {task.obj.name}')
-            task.obj_runner.start()
-            task.obj_runner.get_status()
+
+            try:
+                task.obj_runner.start()
+            except (ValueError, process.ProcessNotStarted):
+                logger.error(f'Failed to start: {self.obj}', exc_info=True)
+                raise
+
             sleep_after_start = task.sleep_after_start
-            
             if sleep_after_start is not None:
-                logger.info(f"[{self.__class__.__name__}] Sleeping {sleep_after_start} s after task start")
+                logger.info(f'[{self.__class__.__name__}] Sleeping {sleep_after_start}s after task start')
                 time.sleep(sleep_after_start)
 
-            logging.info(f'[{self.__class__.__name__}] Task - Started successfully')
+            # logging.info(f'[{self.__class__.__name__}] Task - Started successfully')
 
         self.is_started = True
 
-        logging.info(f'[{self.__class__.__name__}] Experiment - Started successfully')
+        # logging.info(f'[{self.__class__.__name__}] Experiment - Started successfully')
 
 
     def stop(self):
+        """
+        Raises:
+            ValueError
+            process.ProcessNotStopped
+        """
         logger.info(f'[{self.__class__.__name__}] Stopping experiment')
 
         if not self.is_started:
@@ -164,24 +171,27 @@ class SingleExperimentRunner:
                 f'Stop can not be done.'
             )
 
-        # Stop the tasks in reverse order
-        # TODO: Catch exceptions, clean up
+        # TODO: Stop the tasks in reverse order
         if self.ignore_stop_order:
             for task in self.tasks:
-                sleep_after_stop = task.sleep_after_stop
-
                 logging.info(f'[{self.__class__.__name__}] Stopping task: {task.name}')
-                task.obj_runner.stop()
 
+                try:
+                    task.obj_runner.stop()
+                except (ValueError, process.ProcessNotStopped):
+                    logger.error(f'Failed to stop: {self.obj}, {self.runner}', exc_info=True)
+                    raise
+
+                sleep_after_stop = task.sleep_after_stop
                 if sleep_after_stop is not None:
                     logger.info(f"[{self.__class__.__name__}] Sleeping {sleep_after_stop}s ...")
                     time.sleep(sleep_after_stop)
 
-                logging.info(f'[{self.__class__.__name__}] Task - Stopped successfully')
+                # logging.info(f'[{self.__class__.__name__}] Task - Stopped successfully')
 
         # TODO: Implement stopping tasks according to the specified stop order
         
-        logger.info(f'[{self.__class__.__name__}] Experiment - Stopped successfully')
+        # logger.info(f'[{self.__class__.__name__}] Experiment - Stopped successfully')
 
 
     def get_status(self):
@@ -192,7 +202,10 @@ class SingleExperimentRunner:
         logger.info(f'[{self.__class__.__name__}] Collecting experiment results')
 
         if not self.is_started:
-            raise ValueError(f'Experiment has not been started yet')
+            raise ValueError(
+                'Experiment has not been started yet. '
+                'Can not collect results.'
+            )
 
         # if_stopped - and then collect results to prevent the situation when the
         # experiment is still running and we are trying to collect results before stopping it
@@ -202,7 +215,7 @@ class SingleExperimentRunner:
         for task in self.tasks:
             task.obj_runner.collect_results()
 
-        logger.info(f'[{self.__class__.__name__}] Collected successfully')
+        # logger.info(f'[{self.__class__.__name__}] Collected successfully')
 
 
     def _clean_up(self):

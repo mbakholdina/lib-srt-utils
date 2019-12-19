@@ -28,14 +28,13 @@ SSH_COMMON_ARGS = [
 ]
 
 
-def create_directory_internal(dirpath: pathlib.Path):
-    logger.info(f'Creating a directory for ...: {dirpath}')
+def create_local_directory(dirpath: pathlib.Path):
+    logger.info(f'Creating a local directory for saving object results: {dirpath}')
     if dirpath.exists():
-        logger.info('Directory already exists, no need to create')
+        logger.info(f'Directory already exists, no need to create: {dirpath}')
         return
-    
     dirpath.mkdir(parents=True)
-    logger.info('Created successfully')
+    # logger.info('Created successfully')
 
 
 class IObjectRunner(ABC):
@@ -47,6 +46,8 @@ class IObjectRunner(ABC):
     @classmethod
     @abstractmethod
     def from_config(cls, obj: objects.IObject, config: dict):
+        # obj - object (app, hublet) to run
+        # config - runner config
         pass
 
     @abstractmethod
@@ -70,6 +71,7 @@ class LocalProcess(IObjectRunner):
     """ TODO """
 
     def __init__(self, obj: objects.IObject, collect_results_path: pathlib.Path=pathlib.Path('.')):
+        # dirpath (on machine where we run the script) where to collect results
         self.obj = obj
         self.collect_results_path = collect_results_path
         self.runner = process.Process(self.obj.make_args())
@@ -78,19 +80,25 @@ class LocalProcess(IObjectRunner):
 
     @staticmethod
     def _create_directory(dirpath: pathlib.Path):
-        logger.info(f'Creating a directory for saving results: {dirpath}')
-        if dirpath.exists():
-            logger.info('Directory already exists, no need to create')
-            return
-        dirpath.mkdir(parents=True)
-        logger.info('Created successfully')
+        create_local_directory(dirpath)
+        # logger.info(f'Creating a directory for saving results: {dirpath}')
+        # if dirpath.exists():
+        #     logger.info('Directory already exists, no need to create')
+        #     return
+        # dirpath.mkdir(parents=True)
+        # logger.info('Created successfully')
 
 
     @classmethod
     def from_config(cls, obj: objects.IObject, config: dict={}):
-        if config:
-            collect_results_path = pathlib.Path(config['collect_results_path'])
-            return cls(obj, collect_results_path)
+        """
+        Config Example:
+            config = {
+                'collect_results_path': '_results_exp'      # optional
+            }
+        """
+        if 'collect_results_path' in config:
+            return cls(obj, pathlib.Path(config['collect_results_path']))
 
         return cls(obj)
 
@@ -99,14 +107,14 @@ class LocalProcess(IObjectRunner):
         """ 
         Raises:
             ValueError
-            ProcessNotStarted
+            process.ProcessNotStarted
         """
-        logger.info(f'Starting on-premises: {self.obj}')
+        logger.info(f'Starting object on-premises: {self.obj}')
 
         if self.is_started:
             raise ValueError(
                 f'Process has been started already: {self.obj}. '
-                f'Start can not be done'
+                f'Start can not be done.'
             )
 
         if self.obj.dirpath != None:
@@ -127,14 +135,14 @@ class LocalProcess(IObjectRunner):
         """ 
         Raises:
             ValueError
-            ProcessNotStopped
+            process.ProcessNotStopped
         """
-        logger.info(f'Stopping on-premises: {self.obj}, {self.runner}')
+        logger.info(f'Stopping object on-premises: {self.obj}, {self.runner}')
 
         if not self.is_started:
             raise ValueError(
                 f'Process has not been started yet: {self.obj}. '
-                f'Stop can not be done'
+                f'Stop can not be done.'
             )
 
         try:
@@ -147,12 +155,16 @@ class LocalProcess(IObjectRunner):
 
 
     def get_status(self):
+        """ 
+        Raises:
+            ValueError
+        """
         logger.info(f'Getting status: {self.obj}, {self.runner}')
 
         if not self.is_started:
             raise ValueError(
                 f'Process has not been started yet: {self.obj}. '
-                f'Can not get status'
+                f'Can not get status.'
             )
 
         status, _ = self.runner.get_status()
@@ -165,7 +177,7 @@ class LocalProcess(IObjectRunner):
         if not self.is_started:
             raise ValueError(
                 f'Process has not been started yet: {self.obj}. '
-                f'Can not collect results.'
+                'Can not collect results.'
             )
 
         stdout, stderr = self.runner.collect_results()
@@ -201,7 +213,7 @@ class LocalProcess(IObjectRunner):
         destination = destination_dir / filename
         print(f'destination: {destination}')
 
-        create_directory_internal(destination_dir)
+        create_local_directory(destination_dir)
 
         # The code above will raise a FileExistsError if destination already exists. 
         # Technically, this copies a file. To perform a move, simply delete source 
@@ -227,28 +239,41 @@ class LocalProcess(IObjectRunner):
 class RemoteProcess(IObjectRunner):
     """ TODO """
 
-    def __init__(self, obj, username, host):
+    def __init__(
+        self,
+        obj: objects.IObject,
+        username: str,
+        host: str,
+        collect_results_path: pathlib.Path=pathlib.Path('.')
+    ):
         self.obj = obj
         self.username = username
         self.host = host
+        self.collect_results_path = collect_results_path
 
         args = []
         args += SSH_COMMON_ARGS
         args += [f'{self.username}@{self.host}']
         obj_args = [f'"{arg}"'for arg in self.obj.make_args()]
         args += obj_args
-        print(args)
 
         self.runner = process.Process(args, True)
         self.is_started = False
 
-        # TODO: ?
-        # self.dirpath - directory where to collect results
-
 
     @staticmethod
-    def _create_directory(dirpath: str, username: str, host: str):
-        logger.info(f'Creating a directory for saving results: {dirpath}')
+    def _create_directory(dirpath: str, username: str, host: str, classname: str):
+        """
+        Raises:
+            DirectoryHasNotBeenCreated
+            paramiko.ssh_exception.SSHException
+            TimeoutError
+        """
+        print(type(classname))
+        logger.info(
+            f'[{classname}] Creating a directory for saving '
+            f'results remotely via SSH: {dirpath}'
+        )
 
         try:
             # FIXME: By default Paramiko will attempt to connect to a running 
@@ -257,61 +282,79 @@ class RemoteProcess(IObjectRunner):
             # disabled under condition that password is not configured via 
             # connect_kwargs.password
             with fabric.Connection(host=host, user=username) as c:
-                # result = c.run(f'rm -rf {results_dir}')
+                # result = c.run(f'rm -rf {dirpath}')
                 # if result.exited != 0:
-                #     logger.info(f'Not created: {result}')
+                #     logger.info(f'Not deleted: {result}')
                 #     return
                 result = c.run(f'mkdir -p {dirpath}')
-                # print(result.succeeded)
-                # print(result.failed)
-                # print(result.exited)
-                # print(result)
                 if result.exited != 0:
-                    logger.debug(f'Directory has not been created: {dirpath}')
-                    raise DirectoryHasNotBeenCreated(f'Username: {username}, host: {host}, dirpath: {dirpath}')
+                    logger.error(
+                        f'[{classname}] Directory has not been '
+                        f'created: {dirpath}'
+                    )
+                    raise DirectoryHasNotBeenCreated(
+                        f'[{classname}] Username: {username}, '
+                        f'host: {host}, dirpath: {dirpath}'
+                    )
         except paramiko.ssh_exception.SSHException as error:
             logger.info(
-                f'Exception occured ({error.__class__.__name__}): {error}. '
+                f'[{classname}] Exception occured ({error.__class__.__name__}): {error}. '
                 'Check that the ssh-agent has been started.'
             )
             raise
         except TimeoutError as error:
             logger.info(
-                f'Exception occured ({error.__class__.__name__}): {error}. '
+                f'[{classname}] Exception occured ({error.__class__.__name__}): {error}. '
                 'Check that IP address of the remote machine is correct and the '
                 'machine is not down.'
             )
             raise
 
-        logger.info(f'Created successfully')
+        logger.info(f'[{classname}] Created successfully')
 
 
     @classmethod
     def from_config(cls, obj: objects.IObject, config: dict):
-        # obj - object (app, hublet) to run
-        # config - runner config
         """
-        config = {
-            'username': 'msharabayko',
-            'host': '137.135.161.223',
-        }
+        Config Example:
+            config = {
+                'username': 'msharabayko',
+                'host': '137.135.161.223',
+                'collect_results_path': '_results_exp'      # optional
+            }
         """
+        if 'collect_results_path' in config:
+            return cls(
+                obj,
+                config['username'],
+                config['host'],
+                pathlib.Path(config['collect_results_path'])
+            )
+
         return cls(obj, config['username'], config['host'])
 
 
     def start(self):
-        # TODO: This function is almost the same as for LocalProcess class
-        # except some logger info and create_dir function args
-        logger.info(f'Starting remotely via SSH: {self.obj}')
+        """ 
+        Raises:
+            ValueError
+            process.ProcessNotStarted
+        """
+        logger.info(f'Starting object remotely via SSH: {self.obj}')
 
         if self.is_started:
             raise ValueError(
                 f'Process has been started already: {self.obj}. '
-                f'Start can not be done'
+                f'Start can not be done.'
             )
 
         if self.obj.dirpath != None:
-            self._create_directory(self.obj.dirpath, self.username, self.host)
+            self._create_directory(
+                self.obj.dirpath,
+                self.username,
+                self.host,
+                self.__class__.__name__
+            )
 
         try:
             self.runner.start()
@@ -325,14 +368,17 @@ class RemoteProcess(IObjectRunner):
 
 
     def stop(self):
-        # TODO: Almost the same function
-
-        logger.info(f'Stopping remotely via SSH: {self.obj}, {self.runner}')
+        """ 
+        Raises:
+            ValueError
+            process.ProcessNotStopped
+        """
+        logger.info(f'Stopping object remotely via SSH: {self.obj}, {self.runner}')
 
         if not self.is_started:
             raise ValueError(
                 f'Process has not been started yet: {self.obj}. '
-                f'Stop can not be done'
+                f'Stop can not be done.'
             )
 
         try:
@@ -345,8 +391,10 @@ class RemoteProcess(IObjectRunner):
 
 
     def get_status(self):
-        # TODO: The same function
-
+        """ 
+        Raises:
+            ValueError
+        """
         logger.info(f'Getting status: {self.obj}, {self.runner}')
 
         if not self.is_started:
@@ -379,6 +427,10 @@ class RemoteProcess(IObjectRunner):
 
         print(self.obj.dirpath)
         print(self.obj.filepath)
+
+        # TODO: All the checks as above
+
+
 
         # Create directory on the local machine
         # TODO: redundant code
