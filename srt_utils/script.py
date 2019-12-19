@@ -66,14 +66,14 @@ def create_experiment_config(stop_after: int, collect_results_path: str, ignore_
         'username': 'msharabayko',
         'host': '137.116.228.51',
     }
-    # config['tasks']['1'] = create_task_config(
-    #     'tshark', 
-    #     tshark_config, 
-    #     'ssh-subprocess', 
-    #     tshark_runner_config,
-    #     None,
-    #     sleep_after_stop
-    # )
+    config['tasks']['1'] = create_task_config(
+        'tshark', 
+        tshark_config, 
+        'ssh-subprocess', 
+        tshark_runner_config,
+        None,
+        sleep_after_stop
+    )
 
     srt_test_msg_config = {
         'path': '/Users/msharabayko/projects/srt/srt-maxlovic/_build',
@@ -166,6 +166,7 @@ if __name__ == '__main__':
 
     logging.basicConfig(
         level=logging.INFO,
+        # format='%(asctime)s %(name)-12s %(levelname)-8s %(message)s',
         format='%(asctime)-15s [%(levelname)s] %(message)s',
     )
 
@@ -185,4 +186,4 @@ if __name__ == '__main__':
     logger.info(f'Sleeping {stop_after} s ...')
     time.sleep(stop_after)
     exp_runner.stop()
-    # exp_runner.collect_results()
+    exp_runner.collect_results()
