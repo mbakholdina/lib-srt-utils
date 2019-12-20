@@ -28,6 +28,22 @@ SSH_COMMON_ARGS = [
 ]
 
 
+class DirectoryDoesNotExist(Exception):
+    pass
+
+
+class DirectoryHasNotBeenCreated(Exception):
+    pass
+
+
+class NoOutputProduced(Exception):
+    pass
+
+
+class FailedToStartObject(Exception):
+    pass
+
+
 def create_local_directory(dirpath: pathlib.Path):
     logger.info(f'Creating a local directory for saving object results: {dirpath}')
     if dirpath.exists():
@@ -35,6 +51,33 @@ def create_local_directory(dirpath: pathlib.Path):
         return
     dirpath.mkdir(parents=True)
     # logger.info('Created successfully')
+
+
+def get_status(is_started: bool, proc: process.Process):
+    """
+    False - idle
+    True - running
+    """
+    # logger.info(f'Getting status: {self.obj}, {self.runner}')
+
+    # if not self.is_started:
+    #     raise ValueError(
+    #         f'Process has not been started yet: {self.obj}. '
+    #         f'Can not get status'
+    #     )
+
+    # status, _ = self.runner.get_status()
+    # return status
+
+    if not is_started:
+        return False
+
+    status, _ = proc.get_status()
+
+    if status == process.ProcessStatus.idle:
+        return False
+
+    return True
 
 
 class IObjectRunner(ABC):
@@ -76,6 +119,7 @@ class LocalProcess(IObjectRunner):
         self.collect_results_path = collect_results_path
         self.runner = process.Process(self.obj.make_args())
         self.is_started = False
+        self.is_stopped = False
 
 
     @staticmethod
@@ -128,7 +172,7 @@ class LocalProcess(IObjectRunner):
 
         self.is_started = True
 
-        logger.info(f'Started successfully: {self.obj}, {self.runner}')
+        # logger.info(f'Started successfully: {self.obj}, {self.runner}')
 
 
     def stop(self):
@@ -150,28 +194,28 @@ class LocalProcess(IObjectRunner):
         except (ValueError, process.ProcessNotStopped):
             logger.error(f'Failed to stop: {self.obj}, {self.runner}', exc_info=True)
             raise
+
+        self.is_stopped = True
         
-        logger.info(f'Stopped successfully: {self.obj}, {self.runner}')
+        # logger.info(f'Stopped successfully: {self.obj}, {self.runner}')
 
 
     def get_status(self):
         """ 
-        Raises:
-            ValueError
+        False - idle
+        True - running
         """
-        logger.info(f'Getting status: {self.obj}, {self.runner}')
-
-        if not self.is_started:
-            raise ValueError(
-                f'Process has not been started yet: {self.obj}. '
-                f'Can not get status.'
-            )
-
-        status, _ = self.runner.get_status()
-        return status
+        return get_status(self.is_started, self.runner)
 
 
     def collect_results(self):
+        """
+        Raises:
+            ValueError
+            DirectoryDoesNotExist
+            NoOutputProduced
+            FileExistsError
+        """
         logger.info(f'Collecting results: {self.obj}, {self.runner}')
         
         if not self.is_started:
@@ -180,60 +224,77 @@ class LocalProcess(IObjectRunner):
                 'Can not collect results.'
             )
 
-        stdout, stderr = self.runner.collect_results()
+        if not self.is_stopped:
+            raise ValueError(
+                f'Process has not been stopped yet: {self.obj}, {self.runner}. '
+                'Can not collect results.'
+            )
+
         # TODO: Implement writing stderr, stdout in files (logs folder)
+        stdout, stderr = self.runner.collect_results()
         print(f'stdout: {stdout}')
         print(f'stderr: {stderr}')
 
+        # It's expected that at this moment directory 
+        # self.collect_results_path already exists, because it is created 
+        # in SingleExperimentRunner class
         if not self.collect_results_path.exists():
-            print('There was no directory for collecting results created, error')
-            # exception
-            # it's expected that this directory is already there and created from SingleExpRunner
-            return
+            logger.error(
+                'There was no directory for collecting results created: '
+                f'{self.collect_results_path}. Can not collect results.',
+                exc_info=True
+            )
+            raise DirectoryDoesNotExist(self.collect_results_path)
 
-        # If an object has filepath defined, it means there should an output file
-        # however it does not mean that the file was created successfully
-        # that's why we check whether the filepath exists
+        # If an object has filepath equal to None, it means there should be
+        # no output file produced
         if self.obj.filepath == None:
-            print('There was no output file expected, nothing to collect')
-            logger.info('Collected successfully')
+            logger.info('There was no output file expected, nothing to collect.')
             return
 
+        # If an object has filepath defined, it means there should be 
+        # an output file produced. However it does not mean that the file
+        # was created successfully, that's why we check whether the filepath exists.
         if not self.obj.filepath.exists():
-            print('There was no output file created, error')
-            # it means that the object has not produce the file, probably because of some error
-            # in this case stdout, stderr of the process will be useful
-            # exception
-            return
+            logger.error(
+                f'There was no output file produced by the object: {self.obj}, '
+                'nothing to collect. '
+                f'Process stdout: {stdout}. Process stderr: {stderr}.'
+            )
+            raise NoOutputProduced(self.obj.filepath)
 
-        # Create runner folder to copy the results - local - inside the self.collect_results_path dir
+        # Create 'local' folder to copy produced by the object file 
+        # (inside self.collect_results_path directory)
         filename = self.obj.filepath.name
         source = self.obj.filepath
         destination_dir = self.collect_results_path / 'local'
         destination = destination_dir / filename
-        print(f'destination: {destination}')
-
         create_local_directory(destination_dir)
 
-        # The code above will raise a FileExistsError if destination already exists. 
+        # The code below will raise a FileExistsError if destination already exists. 
         # Technically, this copies a file. To perform a move, simply delete source 
-        # after the copy is done (see below). Make sure no exception was raised though.
+        # after the copy is done. Make sure no exception was raised though.
 
-        # In case we have several tasks which is runned locally and in case the tasks have the same name,
-        # the result might be overwritten. That's why we do not delite destination file before,
-        # we catch FileExistsError in this case. That's why it is necessary to make unique file names
-        # for different tasks
+        # In case we have several tasks which is runned locally by 
+        # LocalProcess runner and in case the tasks have the same names 
+        # for the output files, the result might be overwritten. 
+        # That's why we do not delete destination file before, instead
+        # we catch FileExistsError exception. That's why it is necessary 
+        # to make sure that the file names for different tasks are unique.
         try:
             with destination.open(mode='xb') as fid:
                 fid.write(source.read_bytes())
         except FileExistsError:
-            print('The destination file already exists, there might be a file collected by the other task/obj')
-            print(f'File was not copied: {self.obj.filepath}')
-            # raise exception ?
+            logger.error(
+                'The destination file already exists, there might be a file '
+                'collected by the other object. File was not copied: '
+                f'{self.obj.filepath}.'
+            )
+            raise
 
-        # Delete source file (?), might be an option, but not necessary as a start
+        # TODO: (?) Delete source file, might be an option, but not necessary as a start
 
-        logger.info('Collected successfully')
+        # logger.info('Collected successfully')
 
 
 class RemoteProcess(IObjectRunner):
@@ -258,7 +319,9 @@ class RemoteProcess(IObjectRunner):
         args += obj_args
 
         self.runner = process.Process(args, True)
+
         self.is_started = False
+        self.is_stopped = False
 
 
     @staticmethod
@@ -266,10 +329,9 @@ class RemoteProcess(IObjectRunner):
         """
         Raises:
             DirectoryHasNotBeenCreated
-            paramiko.ssh_exception.SSHException
-            TimeoutError
+            # paramiko.ssh_exception.SSHException
+            # TimeoutError
         """
-        print(type(classname))
         logger.info(
             f'[{classname}] Creating a directory for saving '
             f'results remotely via SSH: {dirpath}'
@@ -292,23 +354,25 @@ class RemoteProcess(IObjectRunner):
                         f'[{classname}] Directory has not been '
                         f'created: {dirpath}'
                     )
+                    # TODO: To raise an axception here is bad
                     raise DirectoryHasNotBeenCreated(
                         f'[{classname}] Username: {username}, '
                         f'host: {host}, dirpath: {dirpath}'
                     )
         except paramiko.ssh_exception.SSHException as error:
-            logger.info(
+            # NOTE: To catch this exception, just do not run ssh-agent before the experiment
+            logger.error(
                 f'[{classname}] Exception occured ({error.__class__.__name__}): {error}. '
                 'Check that the ssh-agent has been started.'
             )
-            raise
+            raise DirectoryHasNotBeenCreated(dirpath)
         except TimeoutError as error:
             logger.info(
                 f'[{classname}] Exception occured ({error.__class__.__name__}): {error}. '
                 'Check that IP address of the remote machine is correct and the '
                 'machine is not down.'
             )
-            raise
+            raise DirectoryHasNotBeenCreated(dirpath)
 
         logger.info(f'[{classname}] Created successfully')
 
@@ -338,7 +402,8 @@ class RemoteProcess(IObjectRunner):
         """ 
         Raises:
             ValueError
-            process.ProcessNotStarted
+            FailedToStartObject
+            # process.ProcessNotStarted
         """
         logger.info(f'Starting object remotely via SSH: {self.obj}')
 
@@ -349,22 +414,26 @@ class RemoteProcess(IObjectRunner):
             )
 
         if self.obj.dirpath != None:
-            self._create_directory(
-                self.obj.dirpath,
-                self.username,
-                self.host,
-                self.__class__.__name__
-            )
+            try:
+                self._create_directory(
+                    self.obj.dirpath,
+                    self.username,
+                    self.host,
+                    self.__class__.__name__
+                )
+            except DirectoryHasNotBeenCreated:
+                logger.error(f'Failed to start object: {self.obj}')
+                raise FailedToStartObject(self.obj)
 
         try:
             self.runner.start()
         except (ValueError, process.ProcessNotStarted):
             logger.error(f'Failed to start: {self.obj}', exc_info=True)
-            raise
+            raise FailedToStartObject(self.obj)
         
         self.is_started = True
 
-        logger.info(f'Started successfully: {self.obj}, {self.runner}')
+        # logger.info(f'Started successfully: {self.obj}, {self.runner}')
 
 
     def stop(self):
@@ -387,24 +456,16 @@ class RemoteProcess(IObjectRunner):
             logger.error(f'Failed to stop: {self.obj}, {self.runner}', exc_info=True)
             raise
         
-        logger.info(f'Stopped successfully: {self.obj}, {self.runner}')
+        self.is_stopped = True
+        # logger.info(f'Stopped successfully: {self.obj}, {self.runner}')
 
 
     def get_status(self):
         """ 
-        Raises:
-            ValueError
+        False - idle
+        True - running
         """
-        logger.info(f'Getting status: {self.obj}, {self.runner}')
-
-        if not self.is_started:
-            raise ValueError(
-                f'Process has not been started yet: {self.obj}. '
-                f'Can not get status'
-            )
-
-        status, _ = self.runner.get_status()
-        return status
+        return get_status(self.is_started, self.runner)
 
 
     def collect_results(self):

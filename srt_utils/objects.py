@@ -78,12 +78,11 @@ class DirectoryHasNotBeenCreated(Exception):
 class IObject(ABC):
 
     def __init__(self, name: str):
-        # If running an object assumes to have some output files produced,
-        # e.g. dump or stats files, dirpath to store the results should be
-        # specified, otherwise it's None.
         self.name = name
+        # If running an object assumes having some output files produced,
+        # e.g. dump or stats files, dirpath/filepath to store the results should be
+        # specified, otherwise it's None.
         self.dirpath = None
-        # Added here recently
         self.filepath = None
 
     def __str__(self):
@@ -114,11 +113,12 @@ class Tshark(IObject):
     def from_config(cls, config: dict):
         # config - object config (parameters needed to form the args for cmd)
         """ 
-        config = {
-            'interface': 'en0',
-            'port': 4200,
-            'filepath': './dump.pcapng',
-        }
+        Config Example:
+            config = {
+                'interface': 'en0',
+                'port': 4200,
+                'filepath': './dump.pcapng',
+            }
         """
         return cls(
             config['interface'],

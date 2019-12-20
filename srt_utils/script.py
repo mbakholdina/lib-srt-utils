@@ -181,6 +181,7 @@ if __name__ == '__main__':
     # and then config file for the experiment will be built in a function and parameters will be adjusted
     config = create_experiment_config(stop_after, collect_results_path)
 
+    # ? from config
     exp_runner = runners.SingleExperimentRunner(config)
     exp_runner.start()
     logger.info(f'Sleeping {stop_after} s ...')

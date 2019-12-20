@@ -210,7 +210,7 @@ class Process:
 
             try:
                 self._kill()
-            except ProcessNotKilled as e:
+            except ProcessNotKilled:
                 logger.error('Failed to kill process', exc_info=True)
                 raise ProcessNotStopped(f'{self.id}')
 

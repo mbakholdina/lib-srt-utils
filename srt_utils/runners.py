@@ -4,12 +4,19 @@ import time
 
 import srt_utils.objects as objects
 import srt_utils.object_runners as object_runners
+import srt_utils.process as process
+from srt_utils.logutils import ContextualLoggerAdapter
 
 
+# LOGGER = logging.getLogger(__name__)
 logger = logging.getLogger(__name__)
 
 
 class DirectoryExists(Exception):
+    pass
+
+
+class FailedToStartExperiment(Exception):
     pass
 
 
@@ -86,6 +93,9 @@ class SingleExperimentRunner:
             self.tasks += [Task(name, obj, obj_runner, task_config)]
 
         self.is_started = False
+        self.is_stopped = False
+
+        # self.log = ContextualLoggerAdapter(LOGGER, {'context': type(self).__name__})
 
 
     @staticmethod
@@ -109,9 +119,9 @@ class SingleExperimentRunner:
 
 
     @classmethod
-    def from_config(cls, obj: objects.IObject, config: dict):
+    def from_config(cls, config: dict):
         # TODO: Config example
-        return cls(obj, config)
+        return cls(config)
 
 
     def start(self):
@@ -121,7 +131,8 @@ class SingleExperimentRunner:
             DirectoryExists
             process.ProcessNotStarted
         """
-        logger.info(f'[{self.__class__.__name__}] Starting experiment')
+        # self.log.info('Starting experiment')
+        logger.info('Starting experiment')
 
         if self.is_started:
             raise ValueError(
@@ -141,9 +152,12 @@ class SingleExperimentRunner:
 
             try:
                 task.obj_runner.start()
-            except (ValueError, process.ProcessNotStarted):
-                logger.error(f'Failed to start: {self.obj}', exc_info=True)
-                raise
+            except (ValueError, object_runners.FailedToStartObject):
+                logger.error(f'Failed to start task: {task.name}, {task.obj.name}', exc_info=True)
+                # TODO: Clean up
+                self._clean_up()
+
+                raise FailedToStartExperiment()
 
             sleep_after_start = task.sleep_after_start
             if sleep_after_start is not None:
@@ -179,8 +193,9 @@ class SingleExperimentRunner:
                 try:
                     task.obj_runner.stop()
                 except (ValueError, process.ProcessNotStopped):
-                    logger.error(f'Failed to stop: {self.obj}, {self.runner}', exc_info=True)
-                    raise
+                    logger.error(f'Failed to stop: {task.name}', exc_info=True)
+                    # TODO: stop once again
+                    # raise
 
                 sleep_after_stop = task.sleep_after_stop
                 if sleep_after_stop is not None:
@@ -190,6 +205,10 @@ class SingleExperimentRunner:
                 # logging.info(f'[{self.__class__.__name__}] Task - Stopped successfully')
 
         # TODO: Implement stopping tasks according to the specified stop order
+
+        # TODO: clean up, and if clean up does not help - exception
+
+        self.is_stopped = True
         
         # logger.info(f'[{self.__class__.__name__}] Experiment - Stopped successfully')
 
@@ -199,7 +218,11 @@ class SingleExperimentRunner:
 
 
     def collect_results(self):
-        logger.info(f'[{self.__class__.__name__}] Collecting experiment results')
+        """
+        Raises:
+            ValueError
+        """
+        logger.info(f'[{type(self).__name__}] Collecting experiment results')
 
         if not self.is_started:
             raise ValueError(
@@ -207,13 +230,27 @@ class SingleExperimentRunner:
                 'Can not collect results.'
             )
 
-        # if_stopped - and then collect results to prevent the situation when the
-        # experiment is still running and we are trying to collect results before stopping it
-        # the same might be valid for object runners
+        # This is done to prevent the situation when the experiment is still 
+        # running and we are trying to collect results before stopping it
+        if not self.is_stopped:
+            raise ValueError(
+                'Experiment has not been stopped yet. '
+                'Can not collect results.'
+            )
 
-        # catch exceptions
         for task in self.tasks:
-            task.obj_runner.collect_results()
+            try:
+                task.obj_runner.collect_results()
+            except (
+                ValueError,
+                object_runners.DirectoryDoesNotExist,
+                object_runners.NoOutputProduced,
+                FileExistsError
+            ):
+                logger.error(
+                    f'Failed to collect task results: {task.name}',
+                    exc_info=True
+                )
 
         # logger.info(f'[{self.__class__.__name__}] Collected successfully')
 
@@ -221,4 +258,11 @@ class SingleExperimentRunner:
     def _clean_up(self):
         # In case of exception raised and catched - do clean up
         # Stop already started processes
-        pass
+        logger.info('Clean up')
+
+        for task in self.tasks:
+            print(task.name)
+
+            if task.obj_runner.get_status():
+                # Catch exceptions, the same logic as in stop function
+                task.obj_runner.stop()
