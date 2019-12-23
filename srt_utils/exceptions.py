@@ -1,0 +1,4 @@
+
+
+class SrtUtilsException(Exception):
+    pass

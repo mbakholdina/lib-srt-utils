@@ -5,6 +5,7 @@ from abc import abstractmethod, ABC
 import fabric
 import paramiko
 
+from srt_utils.exceptions import SrtUtilsException
 import srt_utils.objects as objects
 import srt_utils.process as process
 
@@ -28,6 +29,7 @@ SSH_COMMON_ARGS = [
 ]
 
 
+# TODO: Delete
 class ObjectRunnersException(Exception):
     pass
 
@@ -35,10 +37,10 @@ class ObjectRunnersException(Exception):
 def create_local_directory(dirpath: pathlib.Path):
     # TODO: Catch exceptions + throw lib exception
     logger.info(f'Creating a local directory for saving object results: {dirpath}')
-    if dirpath.exists():
-        logger.info(f'Directory already exists, no need to create: {dirpath}')
-        return
-    dirpath.mkdir(parents=True)
+    # if dirpath.exists():
+    #     logger.info(f'Directory already exists, no need to create: {dirpath}')
+    #     return
+    dirpath.mkdir(parents=True, exist_ok=True)
     # logger.info('Created successfully')
 
 
@@ -139,30 +141,20 @@ class LocalProcess(IObjectRunner):
     def start(self):
         """ 
         Raises:
-            ObjectRunnersException
+            SrtUtilsException
         """
         logger.info(f'Starting object on-premises: {self.obj}')
 
         if self.is_started:
-            # I guess here log message plus return will be enough to prevent 
-            # starting for the seconf time and everywhere else
-            raise ObjectRunnersException(
-                f'Process has been started already: {self.obj}. '
+            raise SrtUtilsException(
+                f'Process has been started already: {self.obj}, {self.runner}. '
                 f'Start can not be done.'
             )
 
         if self.obj.dirpath != None:
             self._create_directory(self.obj.dirpath)
         
-        # TODO: Delete try here, process should throw exception itself
-        # self.runner.start()
-        try:
-            self.runner.start()
-        except (ValueError, process.ProcessNotStarted):
-            msg = f'Failed to start object: {self.obj}'
-            logger.error(msg, exc_info=True)
-            raise ObjectRunnersException(msg)
-
+        self.runner.start()
         self.is_started = True
 
         # logger.info(f'Started successfully: {self.obj}, {self.runner}')
@@ -171,25 +163,20 @@ class LocalProcess(IObjectRunner):
     def stop(self):
         """ 
         Raises:
-            ObjectRunnersException
+            SrtUtilsException
         """
         logger.info(f'Stopping object on-premises: {self.obj}, {self.runner}')
 
         if not self.is_started:
-            raise ObjectRunnersException(
+            raise SrtUtilsException(
                 f'Process has not been started yet: {self.obj}. '
                 f'Stop can not be done.'
             )
 
-        # TODO: if is_stopped, then return
+        if self.is_stopped:
+            return
 
-        try:
-            self.runner.stop()
-        except (ValueError, process.ProcessNotStopped):
-            msg = f'Failed to stop object: {self.obj}, {self.runner}'
-            logger.error(msg, exc_info=True)
-            raise ObjectRunnersException(msg)
-
+        self.runner.stop()
         self.is_stopped = True
         
         # logger.info(f'Stopped successfully: {self.obj}, {self.runner}')
@@ -206,18 +193,18 @@ class LocalProcess(IObjectRunner):
     def collect_results(self):
         """
         Raises:
-            ObjectRunnersException
+            SrtUtilsException
         """
-        logger.info(f'Collecting results: {self.obj}, {self.runner}')
+        logger.info(f'Collecting object results: {self.obj}, {self.runner}')
         
         if not self.is_started:
-            raise ObjectRunnersException(
+            raise SrtUtilsException(
                 f'Process has not been started yet: {self.obj}. '
                 'Can not collect results.'
             )
 
         if not self.is_stopped:
-            raise ObjectRunnersException(
+            raise SrtUtilsException(
                 f'Process has not been stopped yet: {self.obj}, {self.runner}. '
                 'Can not collect results.'
             )
@@ -233,8 +220,8 @@ class LocalProcess(IObjectRunner):
         if not self.collect_results_path.exists():
             msg =   'There was no directory for collecting results created: ' \
                     f'{self.collect_results_path}. Can not collect results.'
-            logger.error(msg, exc_info=True)
-            raise ObjectRunnersException(msg)
+            # logger.error(msg, exc_info=True)
+            raise SrtUtilsException(msg)
 
         # If an object has filepath equal to None, it means there should be
         # no output file produced
@@ -249,8 +236,8 @@ class LocalProcess(IObjectRunner):
             msg =   f'There was no output file produced by the object: {self.obj}, ' \
                     'nothing to collect. ' \
                     f'Process stdout: {stdout}. Process stderr: {stderr}.'
-            logger.error(msg)
-            raise ObjectRunnersException(msg)
+            # logger.error(msg)
+            raise SrtUtilsException(msg)
 
         # Create 'local' folder to copy produced by the object file 
         # (inside self.collect_results_path directory)
@@ -277,10 +264,10 @@ class LocalProcess(IObjectRunner):
             msg =   'The destination file already exists, there might be a file ' \
                     'collected by the other object. File was not copied: ' \
                     f'{self.obj.filepath}.'
-            logger.error(msg)
-            raise ObjectRunnersException(msg)
+            # logger.error(msg)
+            raise SrtUtilsException(msg)
 
-        # TODO: (?) Delete source file, might be an option, but not necessary as a start
+        # TODO: (?) Delete source file, might be an option, but not necessary at the start
 
         # logger.info('Collected successfully')
 

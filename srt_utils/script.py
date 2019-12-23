@@ -46,10 +46,24 @@ def create_experiment_config(stop_after: int, collect_results_path: str, ignore_
     tshark_config = {
         'interface': 'en0',
         'port': 4200,
-        'filepath': f'{dirpath}_local/dump.pcapng',
+        'filepath': f'{dirpath}_local/dump1.pcapng',
     }
     tshark_runner_config = {}
     config['tasks']['0'] = create_task_config(
+        'tshark', 
+        tshark_config, 
+        'subprocess', 
+        tshark_runner_config,
+        sleep_after_start
+    )
+
+    tshark_config = {
+        'interface': 'en0',
+        'port': 4200,
+        'filepath': f'{dirpath}_local/dump2.pcapng',
+    }
+    tshark_runner_config = {}
+    config['tasks']['1'] = create_task_config(
         'tshark', 
         tshark_config, 
         'subprocess', 
@@ -66,14 +80,14 @@ def create_experiment_config(stop_after: int, collect_results_path: str, ignore_
         'username': 'msharabayko',
         'host': '137.116.228.51',
     }
-    config['tasks']['1'] = create_task_config(
-        'tshark', 
-        tshark_config, 
-        'ssh-subprocess', 
-        tshark_runner_config,
-        None,
-        sleep_after_stop
-    )
+    # config['tasks']['1'] = create_task_config(
+    #     'tshark', 
+    #     tshark_config, 
+    #     'ssh-subprocess', 
+    #     tshark_runner_config,
+    #     None,
+    #     sleep_after_stop
+    # )
 
     srt_test_msg_config = {
         'path': '/Users/msharabayko/projects/srt/srt-maxlovic/_build',
