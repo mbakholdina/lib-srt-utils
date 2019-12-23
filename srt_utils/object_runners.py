@@ -35,13 +35,11 @@ class ObjectRunnersException(Exception):
 
 
 def create_local_directory(dirpath: pathlib.Path):
-    # TODO: Catch exceptions + throw lib exception
     logger.info(f'Creating a local directory for saving object results: {dirpath}')
-    # if dirpath.exists():
-    #     logger.info(f'Directory already exists, no need to create: {dirpath}')
-    #     return
+    if dirpath.exists():
+        logger.info(f'Directory already exists, no need to create: {dirpath}')
+        return
     dirpath.mkdir(parents=True, exist_ok=True)
-    # logger.info('Created successfully')
 
 
 def get_status(is_started: bool, proc: process.Process):
