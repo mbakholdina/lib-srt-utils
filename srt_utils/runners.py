@@ -152,7 +152,7 @@ class SingleExperimentRunner:
 
             try:
                 task.obj_runner.start()
-            except (ValueError, object_runners.FailedToStartObject):
+            except object_runners.ObjectRunnersException:
                 logger.error(f'Failed to start task: {task.name}, {task.obj.name}', exc_info=True)
                 # TODO: Clean up
                 self._clean_up()
@@ -241,12 +241,7 @@ class SingleExperimentRunner:
         for task in self.tasks:
             try:
                 task.obj_runner.collect_results()
-            except (
-                ValueError,
-                object_runners.DirectoryDoesNotExist,
-                object_runners.NoOutputProduced,
-                FileExistsError
-            ):
+            except object_runners.ObjectRunnersException:
                 logger.error(
                     f'Failed to collect task results: {task.name}',
                     exc_info=True

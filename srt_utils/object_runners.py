@@ -28,19 +28,7 @@ SSH_COMMON_ARGS = [
 ]
 
 
-class DirectoryDoesNotExist(Exception):
-    pass
-
-
-class DirectoryHasNotBeenCreated(Exception):
-    pass
-
-
-class NoOutputProduced(Exception):
-    pass
-
-
-class FailedToStartObject(Exception):
+class ObjectRunnersException(Exception):
     pass
 
 
@@ -150,13 +138,14 @@ class LocalProcess(IObjectRunner):
     def start(self):
         """ 
         Raises:
-            ValueError
-            process.ProcessNotStarted
+            ObjectRunnersException
         """
         logger.info(f'Starting object on-premises: {self.obj}')
 
         if self.is_started:
-            raise ValueError(
+            # I guess here log message plus return will be enough to prevent 
+            # starting for the seconf time and everywhere else
+            raise ObjectRunnersException(
                 f'Process has been started already: {self.obj}. '
                 f'Start can not be done.'
             )
@@ -167,8 +156,9 @@ class LocalProcess(IObjectRunner):
         try:
             self.runner.start()
         except (ValueError, process.ProcessNotStarted):
-            logger.error(f'Failed to start: {self.obj}', exc_info=True)
-            raise
+            msg = f'Failed to start object: {self.obj}'
+            logger.error(msg, exc_info=True)
+            raise ObjectRunnersException(msg)
 
         self.is_started = True
 
@@ -178,13 +168,12 @@ class LocalProcess(IObjectRunner):
     def stop(self):
         """ 
         Raises:
-            ValueError
-            process.ProcessNotStopped
+            ObjectRunnersException
         """
         logger.info(f'Stopping object on-premises: {self.obj}, {self.runner}')
 
         if not self.is_started:
-            raise ValueError(
+            raise ObjectRunnersException(
                 f'Process has not been started yet: {self.obj}. '
                 f'Stop can not be done.'
             )
@@ -192,8 +181,9 @@ class LocalProcess(IObjectRunner):
         try:
             self.runner.stop()
         except (ValueError, process.ProcessNotStopped):
-            logger.error(f'Failed to stop: {self.obj}, {self.runner}', exc_info=True)
-            raise
+            msg = f'Failed to stop object: {self.obj}, {self.runner}'
+            logger.error(msg, exc_info=True)
+            raise ObjectRunnersException(msg)
 
         self.is_stopped = True
         
@@ -211,21 +201,18 @@ class LocalProcess(IObjectRunner):
     def collect_results(self):
         """
         Raises:
-            ValueError
-            DirectoryDoesNotExist
-            NoOutputProduced
-            FileExistsError
+            ObjectRunnersException
         """
         logger.info(f'Collecting results: {self.obj}, {self.runner}')
         
         if not self.is_started:
-            raise ValueError(
+            raise ObjectRunnersException(
                 f'Process has not been started yet: {self.obj}. '
                 'Can not collect results.'
             )
 
         if not self.is_stopped:
-            raise ValueError(
+            raise ObjectRunnersException(
                 f'Process has not been stopped yet: {self.obj}, {self.runner}. '
                 'Can not collect results.'
             )
@@ -239,12 +226,10 @@ class LocalProcess(IObjectRunner):
         # self.collect_results_path already exists, because it is created 
         # in SingleExperimentRunner class
         if not self.collect_results_path.exists():
-            logger.error(
-                'There was no directory for collecting results created: '
-                f'{self.collect_results_path}. Can not collect results.',
-                exc_info=True
-            )
-            raise DirectoryDoesNotExist(self.collect_results_path)
+            msg =   'There was no directory for collecting results created: ' \
+                    f'{self.collect_results_path}. Can not collect results.'
+            logger.error(msg, exc_info=True)
+            raise ObjectRunnersException(msg)
 
         # If an object has filepath equal to None, it means there should be
         # no output file produced
@@ -256,12 +241,11 @@ class LocalProcess(IObjectRunner):
         # an output file produced. However it does not mean that the file
         # was created successfully, that's why we check whether the filepath exists.
         if not self.obj.filepath.exists():
-            logger.error(
-                f'There was no output file produced by the object: {self.obj}, '
-                'nothing to collect. '
-                f'Process stdout: {stdout}. Process stderr: {stderr}.'
-            )
-            raise NoOutputProduced(self.obj.filepath)
+            msg =   f'There was no output file produced by the object: {self.obj}, ' \
+                    'nothing to collect. ' \
+                    f'Process stdout: {stdout}. Process stderr: {stderr}.'
+            logger.error(msg)
+            raise ObjectRunnersException(msg)
 
         # Create 'local' folder to copy produced by the object file 
         # (inside self.collect_results_path directory)
@@ -285,12 +269,11 @@ class LocalProcess(IObjectRunner):
             with destination.open(mode='xb') as fid:
                 fid.write(source.read_bytes())
         except FileExistsError:
-            logger.error(
-                'The destination file already exists, there might be a file '
-                'collected by the other object. File was not copied: '
-                f'{self.obj.filepath}.'
-            )
-            raise
+            msg =   'The destination file already exists, there might be a file ' \
+                    'collected by the other object. File was not copied: ' \
+                    f'{self.obj.filepath}.'
+            logger.error(msg)
+            raise ObjectRunnersException(msg)
 
         # TODO: (?) Delete source file, might be an option, but not necessary as a start
 
@@ -328,14 +311,15 @@ class RemoteProcess(IObjectRunner):
     def _create_directory(dirpath: str, username: str, host: str, classname: str):
         """
         Raises:
-            DirectoryHasNotBeenCreated
-            # paramiko.ssh_exception.SSHException
-            # TimeoutError
+            ObjectRunnersException
         """
         logger.info(
             f'[{classname}] Creating a directory for saving '
             f'results remotely via SSH: {dirpath}'
         )
+
+        # TODO: One final message that directory has not been 
+        # created in case of not success
 
         try:
             # FIXME: By default Paramiko will attempt to connect to a running 
@@ -355,26 +339,24 @@ class RemoteProcess(IObjectRunner):
                         f'created: {dirpath}'
                     )
                     # TODO: To raise an axception here is bad
-                    raise DirectoryHasNotBeenCreated(
+                    raise ObjectRunnersException(
                         f'[{classname}] Username: {username}, '
                         f'host: {host}, dirpath: {dirpath}'
                     )
         except paramiko.ssh_exception.SSHException as error:
             # NOTE: To catch this exception, just do not run ssh-agent before the experiment
-            logger.error(
-                f'[{classname}] Exception occured ({error.__class__.__name__}): {error}. '
-                'Check that the ssh-agent has been started.'
-            )
-            raise DirectoryHasNotBeenCreated(dirpath)
+            msg =   f'[{classname}] Exception occured ({error.__class__.__name__}): {error}. ' \
+                    'Check that the ssh-agent has been started.'
+            logger.error(msg)
+            raise ObjectRunnersException(msg)
         except TimeoutError as error:
-            logger.info(
-                f'[{classname}] Exception occured ({error.__class__.__name__}): {error}. '
-                'Check that IP address of the remote machine is correct and the '
-                'machine is not down.'
-            )
-            raise DirectoryHasNotBeenCreated(dirpath)
+            msg =   f'[{classname}] Exception occured ({error.__class__.__name__}): {error}. ' \
+                    'Check that IP address of the remote machine is correct and the ' \
+                    'machine is not down.'
+            logger.error(msg)
+            raise ObjectRunnersException(msg)
 
-        logger.info(f'[{classname}] Created successfully')
+        # logger.info(f'[{classname}] Created successfully')
 
 
     @classmethod
@@ -401,35 +383,31 @@ class RemoteProcess(IObjectRunner):
     def start(self):
         """ 
         Raises:
-            ValueError
-            FailedToStartObject
-            # process.ProcessNotStarted
+            ObjectRunnersException
         """
         logger.info(f'Starting object remotely via SSH: {self.obj}')
 
+        msg = f'Failed to start object: {self.obj}'
+
         if self.is_started:
-            raise ValueError(
+            raise ObjectRunnersException(
                 f'Process has been started already: {self.obj}. '
                 f'Start can not be done.'
             )
 
         if self.obj.dirpath != None:
-            try:
-                self._create_directory(
-                    self.obj.dirpath,
-                    self.username,
-                    self.host,
-                    self.__class__.__name__
-                )
-            except DirectoryHasNotBeenCreated:
-                logger.error(f'Failed to start object: {self.obj}')
-                raise FailedToStartObject(self.obj)
+            self._create_directory(
+                self.obj.dirpath,
+                self.username,
+                self.host,
+                self.__class__.__name__
+            )
 
         try:
             self.runner.start()
         except (ValueError, process.ProcessNotStarted):
-            logger.error(f'Failed to start: {self.obj}', exc_info=True)
-            raise FailedToStartObject(self.obj)
+            logger.error(msg, exc_info=True)
+            raise ObjectRunnersException(msg)
         
         self.is_started = True
 
@@ -439,13 +417,12 @@ class RemoteProcess(IObjectRunner):
     def stop(self):
         """ 
         Raises:
-            ValueError
-            process.ProcessNotStopped
+            ObjectRunnersException
         """
         logger.info(f'Stopping object remotely via SSH: {self.obj}, {self.runner}')
 
         if not self.is_started:
-            raise ValueError(
+            raise ObjectRunnersException(
                 f'Process has not been started yet: {self.obj}. '
                 f'Stop can not be done.'
             )
@@ -453,8 +430,9 @@ class RemoteProcess(IObjectRunner):
         try:
             self.runner.stop()
         except (ValueError, process.ProcessNotStopped):
-            logger.error(f'Failed to stop: {self.obj}, {self.runner}', exc_info=True)
-            raise
+            msg = f'Failed to stop: {self.obj}, {self.runner}'
+            logger.error(msg, exc_info=True)
+            raise ObjectRunnersException(msg)
         
         self.is_stopped = True
         # logger.info(f'Stopped successfully: {self.obj}, {self.runner}')
@@ -468,11 +446,16 @@ class RemoteProcess(IObjectRunner):
         return get_status(self.is_started, self.runner)
 
 
+    # TODO: The implementation is not finished
     def collect_results(self):
+        """
+        Raises:
+            ObjectRunnersException
+        """
         logger.info(f'Collecting results: {self.obj}, {self.runner}')
         
         if not self.is_started:
-            raise ValueError(
+            raise ObjectRunnersException(
                 f'Process has not been started yet: {self.obj}. '
                 f'Can not collect results.'
             )
@@ -490,8 +473,6 @@ class RemoteProcess(IObjectRunner):
         print(self.obj.filepath)
 
         # TODO: All the checks as above
-
-
 
         # Create directory on the local machine
         # TODO: redundant code
@@ -524,4 +505,4 @@ class RemoteProcess(IObjectRunner):
         # exit code, stdout, stderr, files
         # download files via scp for SSHSubprocess
 
-        logger.info('Collected successfully')
+        # logger.info('Collected successfully')
