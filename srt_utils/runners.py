@@ -12,11 +12,7 @@ from srt_utils.logutils import ContextualLoggerAdapter
 logger = logging.getLogger(__name__)
 
 
-class DirectoryExists(Exception):
-    pass
-
-
-class FailedToStartExperiment(Exception):
+class RunnersException(Exception):
     pass
 
 
@@ -113,7 +109,7 @@ class SingleExperimentRunner:
                 'name and start the experiment again. Existing directory '
                 'contents will not be changed.'
                 )
-            raise DirectoryExists(dirpath)
+            raise RunnersException(dirpath)
         dirpath.mkdir(parents=True)
         # logger.info(f'[{classname}] Created successfully')
 
@@ -127,24 +123,19 @@ class SingleExperimentRunner:
     def start(self):
         """
         Raises:
-            ValueError
-            DirectoryExists
-            process.ProcessNotStarted
+            RunnersException
         """
         # self.log.info('Starting experiment')
         logger.info('Starting experiment')
 
         if self.is_started:
-            raise ValueError(
+            raise RunnersException(
                 f'Experiment has been started already. '
                 f'Start can not be done.'
             )
 
         # Create a directory for saving experiment results
-        try:
-            self._create_directory(self.collect_results_path, self.__class__.__name__)
-        except DirectoryExists:
-            raise
+        self._create_directory(self.collect_results_path, self.__class__.__name__)
 
         # Start tasks
         for task in self.tasks:
@@ -153,11 +144,12 @@ class SingleExperimentRunner:
             try:
                 task.obj_runner.start()
             except object_runners.ObjectRunnersException:
-                logger.error(f'Failed to start task: {task.name}, {task.obj.name}', exc_info=True)
+                msg = f'Failed to start task: {task.name}, {task.obj.name}'
+                logger.error(msg)
                 # TODO: Clean up
                 self._clean_up()
 
-                raise FailedToStartExperiment()
+                raise RunnersException(msg)
 
             sleep_after_start = task.sleep_after_start
             if sleep_after_start is not None:
@@ -174,13 +166,12 @@ class SingleExperimentRunner:
     def stop(self):
         """
         Raises:
-            ValueError
-            process.ProcessNotStopped
+            RunnersException
         """
         logger.info(f'[{self.__class__.__name__}] Stopping experiment')
 
         if not self.is_started:
-            raise ValueError(
+            raise RunnersException(
                 f'Experiment has not been started yet. '
                 f'Stop can not be done.'
             )
@@ -192,8 +183,8 @@ class SingleExperimentRunner:
 
                 try:
                     task.obj_runner.stop()
-                except (ValueError, process.ProcessNotStopped):
-                    logger.error(f'Failed to stop: {task.name}', exc_info=True)
+                except object_runners.ObjectRunnersException:
+                    logger.error(f'Failed to stop task: {task.name}', exc_info=True)
                     # TODO: stop once again
                     # raise
 
@@ -220,12 +211,12 @@ class SingleExperimentRunner:
     def collect_results(self):
         """
         Raises:
-            ValueError
+            RunnersException
         """
         logger.info(f'[{type(self).__name__}] Collecting experiment results')
 
         if not self.is_started:
-            raise ValueError(
+            raise RunnersException(
                 'Experiment has not been started yet. '
                 'Can not collect results.'
             )
@@ -233,7 +224,7 @@ class SingleExperimentRunner:
         # This is done to prevent the situation when the experiment is still 
         # running and we are trying to collect results before stopping it
         if not self.is_stopped:
-            raise ValueError(
+            raise RunnersException(
                 'Experiment has not been stopped yet. '
                 'Can not collect results.'
             )
