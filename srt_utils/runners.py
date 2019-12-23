@@ -2,6 +2,7 @@ import logging
 import pathlib
 import time
 
+from srt_utils.exceptions import SrtUtilsException
 import srt_utils.objects as objects
 import srt_utils.object_runners as object_runners
 import srt_utils.process as process
@@ -95,21 +96,26 @@ class SingleExperimentRunner:
 
 
     @staticmethod
-    def _create_directory(dirpath: pathlib.Path, classname):
+    def _create_directory(dirpath: pathlib.Path, classname: str):
         """
+        Create a local directory for saving experiment results.
+
         Raises:
-            DirectoryExists
+            SrtUtilsException
         """
-        # but if this dir already exists from the previous run - stop the expirement and ask user to use the other nam
-        # delete the directory is not good, cause the results of the previous run might be needed
         logger.info(f'[{classname}] Creating a local directory for saving experiment results: {dirpath}')
+
         if dirpath.exists():
             logger.error(
-                'Directory already exists, please use non-existing directory '
-                'name and start the experiment again. Existing directory '
-                'contents will not be changed.'
+                f'[{classname}] Directory for saving experiment results '
+                f'already exists: {dirpath}. Please use non-existing '
+                'directory name and start the experiment again. Existing '
+                'directory contents will not be deleted.'
                 )
-            raise RunnersException(dirpath)
+            raise SrtUtilsException(
+                f'Directory for saving experiment results already exists: {dirpath}.'
+            )
+
         dirpath.mkdir(parents=True)
         # logger.info(f'[{classname}] Created successfully')
 
@@ -122,47 +128,31 @@ class SingleExperimentRunner:
 
     def start(self):
         """
+        Start single experiment.
+
         Raises:
-            RunnersException
+            SrtUtilsException
         """
         # self.log.info('Starting experiment')
-        logger.info('Starting experiment')
+        logger.info('Starting single experiment')
 
         if self.is_started:
-            raise RunnersException(
-                f'Experiment has been started already. '
-                f'Start can not be done.'
+            raise SrtUtilsException(
+                'Experiment has been started already. '
+                'Start can not be done.'
             )
 
-        # Create a directory for saving experiment results
-        self._create_directory(self.collect_results_path, self.__class__.__name__)
+        self._create_directory(self.collect_results_path, type(self).__name__)
 
-        # Start tasks
         for task in self.tasks:
-            logging.info(f'[{self.__class__.__name__}] Starting task: {task.name}, {task.obj.name}')
-
-            # TODO: Delete try + clean up we are doing out of the class
-            # task.obj_runner.start()
-            try:
-                task.obj_runner.start()
-            except object_runners.ObjectRunnersException:
-                msg = f'Failed to start task: {task.name}, {task.obj.name}'
-                logger.error(msg)
-                # TODO: Clean up
-                self._clean_up()
-
-                raise RunnersException(msg)
-
+            logging.info(f'Starting task: {task.name}')
+            task.obj_runner.start()
             sleep_after_start = task.sleep_after_start
             if sleep_after_start is not None:
-                logger.info(f'[{self.__class__.__name__}] Sleeping {sleep_after_start}s after task start')
+                logger.info(f'Sleeping {sleep_after_start}s after task start')
                 time.sleep(sleep_after_start)
 
-            # logging.info(f'[{self.__class__.__name__}] Task - Started successfully')
-
         self.is_started = True
-
-        # logging.info(f'[{self.__class__.__name__}] Experiment - Started successfully')
 
 
     def stop(self):
@@ -247,16 +237,23 @@ class SingleExperimentRunner:
         # logger.info(f'[{self.__class__.__name__}] Collected successfully')
 
 
-    def _clean_up(self):
+    def clean_up(self):
         # In case of exception raised and catched - do clean up
         # Stop already started 
         
         # TODO: Here I should stop for several times + log if retry
         logger.info('Clean up')
 
+        if not self.is_started:
+            logger.info(
+                'Experiment has not been started yet. '
+                'Nothing to clean up.'
+            )
+            return
+
         for task in self.tasks:
-            print(task.name)
 
             if task.obj_runner.get_status():
                 # Catch exceptions, the same logic as in stop function
+                logging.info(f'Stopping task: {task.name}')
                 task.obj_runner.stop()

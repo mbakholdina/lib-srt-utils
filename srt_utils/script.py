@@ -4,6 +4,7 @@ import logging
 import pprint
 import time
 
+from srt_utils.exceptions import SrtUtilsException
 import srt_utils.runners as runners
 
 
@@ -197,9 +198,15 @@ if __name__ == '__main__':
 
     # ? from config
     # TODO: Try/catch + finally - clean up
-    exp_runner = runners.SingleExperimentRunner(config)
-    exp_runner.start()
-    logger.info(f'Sleeping {stop_after} s ...')
-    time.sleep(stop_after)
-    exp_runner.stop()
-    exp_runner.collect_results()
+    try:
+        exp_runner = runners.SingleExperimentRunner(config)
+        exp_runner.start()
+        exp_runner.start()
+        logger.info(f'Sleeping {stop_after} s ...')
+        time.sleep(stop_after)
+        exp_runner.stop()
+        exp_runner.collect_results()
+    except SrtUtilsException:
+        logger.error('Error occured', exc_info=True)
+    finally:
+        exp_runner.clean_up()
