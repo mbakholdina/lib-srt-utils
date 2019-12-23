@@ -33,6 +33,7 @@ class ObjectRunnersException(Exception):
 
 
 def create_local_directory(dirpath: pathlib.Path):
+    # TODO: Catch exceptions + throw lib exception
     logger.info(f'Creating a local directory for saving object results: {dirpath}')
     if dirpath.exists():
         logger.info(f'Directory already exists, no need to create: {dirpath}')
@@ -153,6 +154,8 @@ class LocalProcess(IObjectRunner):
         if self.obj.dirpath != None:
             self._create_directory(self.obj.dirpath)
         
+        # TODO: Delete try here, process should throw exception itself
+        # self.runner.start()
         try:
             self.runner.start()
         except (ValueError, process.ProcessNotStarted):
@@ -177,6 +180,8 @@ class LocalProcess(IObjectRunner):
                 f'Process has not been started yet: {self.obj}. '
                 f'Stop can not be done.'
             )
+
+        # TODO: if is_stopped, then return
 
         try:
             self.runner.stop()

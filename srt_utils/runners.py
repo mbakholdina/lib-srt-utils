@@ -141,6 +141,8 @@ class SingleExperimentRunner:
         for task in self.tasks:
             logging.info(f'[{self.__class__.__name__}] Starting task: {task.name}, {task.obj.name}')
 
+            # TODO: Delete try + clean up we are doing out of the class
+            # task.obj_runner.start()
             try:
                 task.obj_runner.start()
             except object_runners.ObjectRunnersException:
@@ -177,16 +179,17 @@ class SingleExperimentRunner:
             )
 
         # TODO: Stop the tasks in reverse order
+        # as of now comment - if self.ignore_stop_order:
         if self.ignore_stop_order:
             for task in self.tasks:
                 logging.info(f'[{self.__class__.__name__}] Stopping task: {task.name}')
 
+                # in case of fail - try to stop the other tasks
                 try:
                     task.obj_runner.stop()
                 except object_runners.ObjectRunnersException:
                     logger.error(f'Failed to stop task: {task.name}', exc_info=True)
-                    # TODO: stop once again
-                    # raise
+                    # TODO: continue
 
                 sleep_after_stop = task.sleep_after_stop
                 if sleep_after_stop is not None:
@@ -199,6 +202,7 @@ class SingleExperimentRunner:
 
         # TODO: clean up, and if clean up does not help - exception
 
+        # TODO: if at least one task is not stop, is stopped = False ???
         self.is_stopped = True
         
         # logger.info(f'[{self.__class__.__name__}] Experiment - Stopped successfully')
@@ -229,6 +233,7 @@ class SingleExperimentRunner:
                 'Can not collect results.'
             )
 
+        # We should try to collect the results for all the tasks
         for task in self.tasks:
             try:
                 task.obj_runner.collect_results()
@@ -237,13 +242,16 @@ class SingleExperimentRunner:
                     f'Failed to collect task results: {task.name}',
                     exc_info=True
                 )
+                # TODO: continue
 
         # logger.info(f'[{self.__class__.__name__}] Collected successfully')
 
 
     def _clean_up(self):
         # In case of exception raised and catched - do clean up
-        # Stop already started processes
+        # Stop already started 
+        
+        # TODO: Here I should stop for several times + log if retry
         logger.info('Clean up')
 
         for task in self.tasks:

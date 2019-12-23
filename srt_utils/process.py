@@ -45,6 +45,7 @@ class Process:
         self.process = None
         self.id = None
         self.is_started = False
+        # TODO: is_stopped ?
 
     
     def __str__(self):
@@ -226,6 +227,7 @@ class Process:
             - returncode is None if the process is running and the actual value 
             of returncode if the process has terminated.
         """
+        # TODO: If process is None, throw exception
         if not self.is_started:
             raise ValueError(
                 f'Process has not been started yet. '

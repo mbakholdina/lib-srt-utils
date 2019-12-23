@@ -182,6 +182,7 @@ if __name__ == '__main__':
     config = create_experiment_config(stop_after, collect_results_path)
 
     # ? from config
+    # TODO: Try/catch + finally - clean up
     exp_runner = runners.SingleExperimentRunner(config)
     exp_runner.start()
     logger.info(f'Sleeping {stop_after} s ...')
