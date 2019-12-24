@@ -88,7 +88,6 @@ class Task:
             'stop_order': 1                     # optional
         }
         """
-        print(config)
         self.name = name
         self.obj = obj
         self.obj_runner = obj_runner
@@ -103,25 +102,38 @@ class Task:
 
 class SingleExperimentRunner:
 
-    def __init__(self, config: dict):
+    def __init__(
+        self,
+        collect_results_path: pathlib.Path,
+        ignore_stop_order: bool,
+        stop_after: int,
+        tasks
+    ):
         """
         Class to run a single experiment.
 
         Attributes:
-            config:
-                Single experiment config.
-
-        Config Example:
-        # TODO
+            collect_results_path:
+                `pathlib.Path` directory path where the results produced by 
+                the experiment should be copied.
+            ignore_stop_order:
+                True/False depending on whether the stop order specified in
+                tasks' configs should be/should not be ignored when stopping
+                the experiment.
+            stop_after:
+                The time in seconds after which experiment should be stopped.
+            tasks:
+                A `dict_items` object with the list of tasks to run within
+                the experiments.
         """
-        self.collect_results_path = pathlib.Path(config['collect_results_path'])
-        self.ignore_stop_order = config['ignore_stop_order']
-        self.stop_after = config['stop_after']
+        self.collect_results_path = collect_results_path
+        self.ignore_stop_order = ignore_stop_order
+        self.stop_after = stop_after
 
         self.tasks = []
         factory = SimpleFactory()
 
-        for task_key, task_config in config['tasks'].items():
+        for task_key, task_config in tasks:
             name = 'task-' + task_key
             obj = factory.create_object(task_config['obj_type'], task_config['obj_config'])
             task_config['runner_config']['collect_results_path'] = self.collect_results_path
@@ -160,7 +172,20 @@ class SingleExperimentRunner:
 
     @classmethod
     def from_config(cls, config: dict):
-        return cls(config)
+        """
+        Attributes:
+            config:
+                Single experiment config.
+
+        Config Example:
+        # TODO
+        """
+        return cls(
+            pathlib.Path(config['collect_results_path']),
+            config['ignore_stop_order'],
+            config['stop_after'],
+            config['tasks'].items()
+        )
 
 
     def start(self):
