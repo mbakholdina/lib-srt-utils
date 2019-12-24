@@ -5,7 +5,7 @@ import pprint
 import time
 
 from srt_utils.exceptions import SrtUtilsException
-import srt_utils.runners as runners
+from srt_utils.runners import SingleExperimentRunner
 
 
 logger = logging.getLogger(__name__)
@@ -55,7 +55,8 @@ def create_experiment_config(stop_after: int, collect_results_path: str, ignore_
         tshark_config, 
         'subprocess', 
         tshark_runner_config,
-        sleep_after_start
+        sleep_after_start,
+        sleep_after_stop
     )
 
     tshark_config = {
@@ -143,40 +144,6 @@ def create_experiment_config(stop_after: int, collect_results_path: str, ignore_
     return config
 
 
-def previous_main():
-    factory = runners.SimpleFactory()
-
-    # time to stream
-    stop_after = 20
-    # TODO: Make an option
-    collect_results_path = '_results_exp'
-    # This will be changed to loading the config from file
-    # and then adjusting it (srt parameters, etc.) knowing what kind of
-    # experiment we are going to do. Or we will provide a cli to user with
-    # the list of parameters we need to know (or it would be just a file with the list of params),
-    # and then config file for the experiment will be built in a function and parameters will be adjusted
-    config = create_experiment_config(stop_after, collect_results_path)
-
-    for task, task_config in config['tasks'].items():
-        obj = factory.create_object(task_config['obj_type'], task_config['obj_config'])
-        # print(obj.make_args())
-        runner_config = task_config['runner_config']
-        print(runner_config)
-        runner_config['collect_results_path'] = collect_results_path
-        print(runner_config)
-        obj_runner = factory.create_runner(obj, task_config['runner_type'], runner_config)
-
-        obj_runner.start()
-        obj_runner.get_status()
-        time.sleep(10)
-
-        obj_runner.stop()
-        obj_runner.get_status()
-        time.sleep(10)
-
-        obj_runner.collect_results()
-
-
 if __name__ == '__main__':
 
     logging.basicConfig(
@@ -196,17 +163,14 @@ if __name__ == '__main__':
     # and then config file for the experiment will be built in a function and parameters will be adjusted
     config = create_experiment_config(stop_after, collect_results_path)
 
-    # ? from config
-    # TODO: Try/catch + finally - clean up
     try:
-        exp_runner = runners.SingleExperimentRunner(config)
+        exp_runner = SingleExperimentRunner.from_config(config)
         exp_runner.start()
-        exp_runner.start()
-        logger.info(f'Sleeping {stop_after} s ...')
+        logger.info(f'Sleeping {stop_after}s after experiment start')
         time.sleep(stop_after)
         exp_runner.stop()
         exp_runner.collect_results()
-    except SrtUtilsException:
-        logger.error('Error occured', exc_info=True)
+    except SrtUtilsException as error:
+        logger.error(f'Failed to run experiment. Reason: {error}', exc_info=True)
     finally:
         exp_runner.clean_up()

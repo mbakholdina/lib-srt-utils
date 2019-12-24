@@ -3,18 +3,13 @@ import pathlib
 import time
 
 from srt_utils.exceptions import SrtUtilsException
+# from srt_utils.logutils import ContextualLoggerAdapter
 import srt_utils.objects as objects
 import srt_utils.object_runners as object_runners
-import srt_utils.process as process
-from srt_utils.logutils import ContextualLoggerAdapter
 
 
 # LOGGER = logging.getLogger(__name__)
 logger = logging.getLogger(__name__)
-
-
-class RunnersException(Exception):
-    pass
 
 
 ### Simple Factory ###
@@ -46,47 +41,91 @@ class SimpleFactory:
         return runner
 
 
-# TODO: Use attrs here
+### ITestRunner -> SingleExperimentRunner, TestRunner, CombinedTestRunner ###
+# The methods will be similar to IRunner
+
+
 class Task:
 
-    def __init__(self, name: str, obj: objects.IObject, obj_runner: object_runners.IObjectRunner, config: dict):
-        # TODO: Check config for validity
+    def __init__(
+        self,
+        name: str,
+        obj: objects.IObject,
+        obj_runner: object_runners.IObjectRunner,
+        config: dict
+    ):
+        """
+        Class to store task details.
+
+        Task represents one step of a single experiment and contains
+        both the information regarding the object to run and the way to
+        run this object (object runner) as well as additional information
+        like the sleep after start/stop time, stop order if defined, etc.
+        
+        Task should be treated as a combination
+        Attributes:
+            name:
+                Task name.
+            obj:
+                `objects.IObject` object to run.
+            obj_runner:
+                `object_runners.IObjectRunner` object runner.
+            config:
+                Task config.
+
+        Config Example:
+        config = { 
+            'obj_config': {
+                'filepath': '_results_local/dump1.pcapng',
+                'interface': 'en0',
+                'port': 4200
+            },
+            'obj_type': 'tshark',
+            'runner_config': {},
+            'runner_type': 'subprocess',
+            'sleep_after_start': 3,             # optional
+            'sleep_after_stop': 3,              # optional
+            'stop_order': 1                     # optional
+        }
+        """
+        print(config)
         self.name = name
         self.obj = obj
         self.obj_runner = obj_runner
-        self.sleep_after_start = config['sleep_after_start']
-        self.sleep_after_stop = config['sleep_after_stop']
-        self.stop_order = config['stop_order']
+        self.sleep_after_start = config.get('sleep_after_start')
+        self.sleep_after_stop = config.get('sleep_after_stop')
+        self.stop_order = config.get('stop_order')
 
 
-### ITestRunner -> SingleExperimentRunner, TestRunner, CombinedTestRunner ###
-# The methods will be similar to IRunner
+    def __str__(self):
+        return f'{self.name}'
+
 
 class SingleExperimentRunner:
 
     def __init__(self, config: dict):
-        self.factory = SimpleFactory()
-        # TODO: Check config for validaty - use some json tools: 
-        # tasks should have unique keys, there should be at least one task defined,
-        # etc. Raise exception in case of problems.
-        self.config = config
+        """
+        Class to run a single experiment.
 
-        # TODO: Add attributes from config
-        self.collect_results_path = pathlib.Path(self.config['collect_results_path'])
-        self.ignore_stop_order = self.config['ignore_stop_order']
+        Attributes:
+            config:
+                Single experiment config.
 
-        # TODO: Create a class for task: obj, obj_runner, sleep_after_stop, stop_order
+        Config Example:
+        # TODO
+        """
+        self.collect_results_path = pathlib.Path(config['collect_results_path'])
+        self.ignore_stop_order = config['ignore_stop_order']
+        self.stop_after = config['stop_after']
+
         self.tasks = []
+        factory = SimpleFactory()
 
-        for task_key, task_config in self.config['tasks'].items():
-            print(task_key)
+        for task_key, task_config in config['tasks'].items():
             name = 'task-' + task_key
-            obj = self.factory.create_object(task_config['obj_type'], task_config['obj_config'])
-            runner_config = task_config['runner_config']
-            runner_config['collect_results_path'] = self.collect_results_path
-            # change task_config as well
-            print(runner_config)
-            obj_runner = self.factory.create_runner(obj, task_config['runner_type'], runner_config)
+            obj = factory.create_object(task_config['obj_type'], task_config['obj_config'])
+            task_config['runner_config']['collect_results_path'] = self.collect_results_path
+            obj_runner = factory.create_runner(obj, task_config['runner_type'], task_config['runner_config'])
             self.tasks += [Task(name, obj, obj_runner, task_config)]
 
         self.is_started = False
@@ -103,26 +142,24 @@ class SingleExperimentRunner:
         Raises:
             SrtUtilsException
         """
-        logger.info(f'[{classname}] Creating a local directory for saving experiment results: {dirpath}')
+        logger.info(
+            f'[{classname}] Creating a local directory for saving experiment '
+            f'results: {dirpath}'
+        )
 
         if dirpath.exists():
-            logger.error(
-                f'[{classname}] Directory for saving experiment results '
-                f'already exists: {dirpath}. Please use non-existing '
-                'directory name and start the experiment again. Existing '
-                'directory contents will not be deleted.'
-                )
             raise SrtUtilsException(
-                f'Directory for saving experiment results already exists: {dirpath}.'
+                'Directory for saving experiment results already exists: '
+                f'{dirpath}. Please use non-existing directory name and '
+                'start the experiment again. Existing directory contents '
+                'will not be deleted'
             )
 
         dirpath.mkdir(parents=True)
-        # logger.info(f'[{classname}] Created successfully')
 
 
     @classmethod
     def from_config(cls, config: dict):
-        # TODO: Config example
         return cls(config)
 
 
@@ -145,7 +182,7 @@ class SingleExperimentRunner:
         self._create_directory(self.collect_results_path, type(self).__name__)
 
         for task in self.tasks:
-            logging.info(f'Starting task: {task.name}')
+            logging.info(f'Starting task: {task}')
             task.obj_runner.start()
             sleep_after_start = task.sleep_after_start
             if sleep_after_start is not None:
@@ -157,45 +194,49 @@ class SingleExperimentRunner:
 
     def stop(self):
         """
+        Stop single experiment.
+
         Raises:
-            RunnersException
+            SrtUtilsException
         """
-        logger.info(f'[{self.__class__.__name__}] Stopping experiment')
+        logger.info(f'Stopping single experiment')
+        not_stopped_tasks = 0
 
         if not self.is_started:
-            raise RunnersException(
-                f'Experiment has not been started yet. '
-                f'Stop can not be done.'
+            raise SrtUtilsException(
+                'Experiment has not been started yet. '
+                'Stop can not be done.'
             )
 
-        # TODO: Stop the tasks in reverse order
-        # as of now comment - if self.ignore_stop_order:
-        if self.ignore_stop_order:
-            for task in self.tasks:
-                logging.info(f'[{self.__class__.__name__}] Stopping task: {task.name}')
+        if self.is_stopped:
+            logger.info('Experiment has been stopped already. Nothing to do')
+            return
 
-                # in case of fail - try to stop the other tasks
-                try:
-                    task.obj_runner.stop()
-                except object_runners.ObjectRunnersException:
-                    logger.error(f'Failed to stop task: {task.name}', exc_info=True)
-                    # TODO: continue
+        # TODO: Implement stopping tasks according to the specified stop order.
+        # By default, stop the tasks in reverse order
+        # if self.ignore_stop_order:
 
+        for task in self.tasks:
+            logging.info(f'Stopping task: {task}')
+
+            # This try/except block is needed here in order to stop as much
+            # tasks as we can in case of something has failed
+            try:
+                task.obj_runner.stop()
+            except SrtUtilsException as error:
+                logger.error(f'Failed to stop task: {task}. Reason: {error}')
+                not_stopped_tasks += 1
+                continue
+            finally:
                 sleep_after_stop = task.sleep_after_stop
                 if sleep_after_stop is not None:
-                    logger.info(f"[{self.__class__.__name__}] Sleeping {sleep_after_stop}s ...")
+                    logger.info(f'Sleeping {sleep_after_stop}s after task stop')
                     time.sleep(sleep_after_stop)
 
-                # logging.info(f'[{self.__class__.__name__}] Task - Stopped successfully')
+        if not_stopped_tasks != 0:
+            raise SrtUtilsException('Not all the tasks have been stopped.')
 
-        # TODO: Implement stopping tasks according to the specified stop order
-
-        # TODO: clean up, and if clean up does not help - exception
-
-        # TODO: if at least one task is not stop, is stopped = False ???
         self.is_stopped = True
-        
-        # logger.info(f'[{self.__class__.__name__}] Experiment - Stopped successfully')
 
 
     def get_status(self):
@@ -204,13 +245,15 @@ class SingleExperimentRunner:
 
     def collect_results(self):
         """
+        Collect experiment results.
+
         Raises:
-            RunnersException
+            SrtUtilsException
         """
-        logger.info(f'[{type(self).__name__}] Collecting experiment results')
+        logger.info('Collecting experiment results')
 
         if not self.is_started:
-            raise RunnersException(
+            raise SrtUtilsException(
                 'Experiment has not been started yet. '
                 'Can not collect results.'
             )
@@ -218,42 +261,50 @@ class SingleExperimentRunner:
         # This is done to prevent the situation when the experiment is still 
         # running and we are trying to collect results before stopping it
         if not self.is_stopped:
-            raise RunnersException(
-                'Experiment has not been stopped yet. '
+            raise SrtUtilsException(
+                'Experiment is still running. '
                 'Can not collect results.'
             )
 
-        # We should try to collect the results for all the tasks
         for task in self.tasks:
+            logging.info(f'Collecting task results: {task}')
+            # This try/except block is needed here in order to collect results
+            # for as much tasks as we can in case of something has failed
             try:
                 task.obj_runner.collect_results()
-            except object_runners.ObjectRunnersException:
-                logger.error(
-                    f'Failed to collect task results: {task.name}',
-                    exc_info=True
-                )
-                # TODO: continue
-
-        # logger.info(f'[{self.__class__.__name__}] Collected successfully')
+            except SrtUtilsException as error:
+                logger.error(f'Failed to collect task results: {task}. Reason: {error}')
+                continue
 
 
     def clean_up(self):
-        # In case of exception raised and catched - do clean up
-        # Stop already started 
-        
-        # TODO: Here I should stop for several times + log if retry
-        logger.info('Clean up')
+        """
+        Perform cleaning up in case of something has gone wrong during 
+        the experiment.
 
-        if not self.is_started:
-            logger.info(
-                'Experiment has not been started yet. '
-                'Nothing to clean up.'
-            )
-            return
+        Raises:
+            SrtUtilsException
+        """
+        logger.info('Cleaning up')
+        not_stopped_tasks = 0
 
         for task in self.tasks:
-
             if task.obj_runner.get_status():
-                # Catch exceptions, the same logic as in stop function
-                logging.info(f'Stopping task: {task.name}')
-                task.obj_runner.stop()
+                logging.info(f'Stopping task: {task}')
+
+                try:
+                    task.obj_runner.stop()
+                except SrtUtilsException as error:
+                    logger.error(f'Failed to stop task: {task}, retrying to stop again. Reason: {error}')
+                    
+                    try:
+                        task.obj_runner.stop()
+                    except SrtUtilsException as error:
+                        logger.error(f'Failed to stop task on the second try: {task}. Reason: {error}')
+                        not_stopped_tasks += 1
+                        continue
+
+        if not_stopped_tasks != 0:
+            raise SrtUtilsException('Not all the tasks have been stopped during cleaning up.')
+
+        self.is_stopped = True
