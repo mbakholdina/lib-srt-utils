@@ -7,7 +7,7 @@ import paramiko
 
 from srt_utils.exceptions import SrtUtilsException
 import srt_utils.objects as objects
-import srt_utils.process as process
+from srt_utils.process import Process, ProcessStatus
 
 
 logger = logging.getLogger(__name__)
@@ -35,19 +35,19 @@ class ObjectRunnersException(Exception):
 
 
 def create_local_directory(dirpath: pathlib.Path):
-    logger.info(f'Creating a local directory for saving object results: {dirpath}')
+    logger.info(f'Creating a local directory for saving/copying object results: {dirpath}')
     if dirpath.exists():
         logger.info(f'Directory already exists, no need to create: {dirpath}')
         return
     dirpath.mkdir(parents=True, exist_ok=True)
 
 
-def get_status(is_started: bool, proc: process.Process):
+def get_status(is_started: bool, proc: Process):
     """
     False - idle
     True - running
     """
-    # logger.info(f'Getting status: {self.obj}, {self.runner}')
+    # logger.info(f'Getting status: {self.obj}, {self.process}')
 
     # if not self.is_started:
     #     raise ValueError(
@@ -55,7 +55,7 @@ def get_status(is_started: bool, proc: process.Process):
     #         f'Can not get status'
     #     )
 
-    # status, _ = self.runner.get_status()
+    # status, _ = self.process.get_status()
     # return status
 
     if not is_started:
@@ -63,7 +63,7 @@ def get_status(is_started: bool, proc: process.Process):
 
     status, _ = proc.get_status()
 
-    if status == process.ProcessStatus.idle:
+    if status == ProcessStatus.idle:
         return False
 
     return True
@@ -100,13 +100,26 @@ class IObjectRunner(ABC):
 
 
 class LocalProcess(IObjectRunner):
-    """ TODO """
 
-    def __init__(self, obj: objects.IObject, collect_results_path: pathlib.Path=pathlib.Path('.')):
+    def __init__(
+        self,
+        obj: objects.IObject,
+        collect_results_path: pathlib.Path=pathlib.Path('.')
+    ):
+        """
+        TODO
+        
+        Attributes:
+            obj:
+                `objects.IObject` object to run.
+            collect_results_path:
+                `pathlib.Path` directory path where the results produced by 
+                the object should be copied.
+        """
         # dirpath (on machine where we run the script) where to collect results
         self.obj = obj
         self.collect_results_path = collect_results_path
-        self.runner = process.Process(self.obj.make_args())
+        self.process = Process(self.obj.make_args())
         self.is_started = False
         self.is_stopped = False
 
@@ -145,17 +158,17 @@ class LocalProcess(IObjectRunner):
 
         if self.is_started:
             raise SrtUtilsException(
-                f'Process has been started already: {self.obj}, {self.runner}. '
+                f'Process has been started already: {self.obj}, {self.process}. '
                 f'Start can not be done.'
             )
 
         if self.obj.dirpath != None:
             self._create_directory(self.obj.dirpath)
         
-        self.runner.start()
+        self.process.start()
         self.is_started = True
 
-        # logger.info(f'Started successfully: {self.obj}, {self.runner}')
+        # logger.info(f'Started successfully: {self.obj}, {self.process}')
 
 
     def stop(self):
@@ -163,7 +176,7 @@ class LocalProcess(IObjectRunner):
         Raises:
             SrtUtilsException
         """
-        logger.info(f'Stopping object on-premises: {self.obj}, {self.runner}')
+        logger.info(f'Stopping object on-premises: {self.obj}, {self.process}')
 
         if not self.is_started:
             raise SrtUtilsException(
@@ -172,12 +185,13 @@ class LocalProcess(IObjectRunner):
             )
 
         if self.is_stopped:
+            logger.info('Process has been stopped already. Nothing to do.')
             return
 
-        self.runner.stop()
+        self.process.stop()
         self.is_stopped = True
         
-        # logger.info(f'Stopped successfully: {self.obj}, {self.runner}')
+        # logger.info(f'Stopped successfully: {self.obj}, {self.process}')
 
 
     def get_status(self):
@@ -185,7 +199,7 @@ class LocalProcess(IObjectRunner):
         False - idle
         True - running
         """
-        return get_status(self.is_started, self.runner)
+        return get_status(self.is_started, self.process)
 
 
     def collect_results(self):
@@ -193,7 +207,7 @@ class LocalProcess(IObjectRunner):
         Raises:
             SrtUtilsException
         """
-        logger.info(f'Collecting object results: {self.obj}, {self.runner}')
+        logger.info(f'Collecting object results: {self.obj}, {self.process}')
         
         if not self.is_started:
             raise SrtUtilsException(
@@ -203,12 +217,12 @@ class LocalProcess(IObjectRunner):
 
         if not self.is_stopped:
             raise SrtUtilsException(
-                f'Process has not been stopped yet: {self.obj}, {self.runner}. '
+                f'Process has not been stopped yet: {self.obj}, {self.process}. '
                 'Can not collect results.'
             )
 
         # TODO: Implement writing stderr, stdout in files (logs folder)
-        stdout, stderr = self.runner.collect_results()
+        stdout, stderr = self.process.collect_results()
         print(f'stdout: {stdout}')
         print(f'stderr: {stderr}')
 
@@ -216,26 +230,26 @@ class LocalProcess(IObjectRunner):
         # self.collect_results_path already exists, because it is created 
         # in SingleExperimentRunner class
         if not self.collect_results_path.exists():
-            msg =   'There was no directory for collecting results created: ' \
-                    f'{self.collect_results_path}. Can not collect results.'
-            # logger.error(msg, exc_info=True)
-            raise SrtUtilsException(msg)
+            raise SrtUtilsException(
+                'There was no directory for collecting results created: '
+                f'{self.collect_results_path}. Can not collect results'
+            )
 
         # If an object has filepath equal to None, it means there should be
         # no output file produced
         if self.obj.filepath == None:
-            logger.info('There was no output file expected, nothing to collect.')
+            logger.info('There was no output file expected, nothing to collect')
             return
 
         # If an object has filepath defined, it means there should be 
         # an output file produced. However it does not mean that the file
         # was created successfully, that's why we check whether the filepath exists.
         if not self.obj.filepath.exists():
-            msg =   f'There was no output file produced by the object: {self.obj}, ' \
-                    'nothing to collect. ' \
-                    f'Process stdout: {stdout}. Process stderr: {stderr}.'
-            # logger.error(msg)
-            raise SrtUtilsException(msg)
+            raise SrtUtilsException(
+                'There was no output file produced by the object: '
+                f'{self.obj}, nothing to collect. Process stdout: '
+                f'{stdout}. Process stderr: {stderr}'
+            )
 
         # Create 'local' folder to copy produced by the object file 
         # (inside self.collect_results_path directory)
@@ -255,19 +269,18 @@ class LocalProcess(IObjectRunner):
         # That's why we do not delete destination file before, instead
         # we catch FileExistsError exception. That's why it is necessary 
         # to make sure that the file names for different tasks are unique.
+        logger.info(f'Copying object results into: {destination_dir}')
         try:
             with destination.open(mode='xb') as fid:
                 fid.write(source.read_bytes())
         except FileExistsError:
-            msg =   'The destination file already exists, there might be a file ' \
-                    'collected by the other object. File was not copied: ' \
-                    f'{self.obj.filepath}.'
-            # logger.error(msg)
-            raise SrtUtilsException(msg)
+            raise SrtUtilsException(
+                'The destination file already exists, there might be a '
+                f'file created by the other object: {destination}. File '
+                f'with object results was not copied: {self.obj.filepath}'
+            )
 
         # TODO: (?) Delete source file, might be an option, but not necessary at the start
-
-        # logger.info('Collected successfully')
 
 
 class RemoteProcess(IObjectRunner):
@@ -291,7 +304,7 @@ class RemoteProcess(IObjectRunner):
         obj_args = [f'"{arg}"'for arg in self.obj.make_args()]
         args += obj_args
 
-        self.runner = process.Process(args, True)
+        self.process = Process(args, True)
 
         self.is_started = False
         self.is_stopped = False
@@ -394,14 +407,14 @@ class RemoteProcess(IObjectRunner):
             )
 
         try:
-            self.runner.start()
+            self.process.start()
         except (ValueError, process.ProcessNotStarted):
             logger.error(msg, exc_info=True)
             raise ObjectRunnersException(msg)
         
         self.is_started = True
 
-        # logger.info(f'Started successfully: {self.obj}, {self.runner}')
+        # logger.info(f'Started successfully: {self.obj}, {self.process}')
 
 
     def stop(self):
@@ -409,7 +422,7 @@ class RemoteProcess(IObjectRunner):
         Raises:
             ObjectRunnersException
         """
-        logger.info(f'Stopping object remotely via SSH: {self.obj}, {self.runner}')
+        logger.info(f'Stopping object remotely via SSH: {self.obj}, {self.process}')
 
         if not self.is_started:
             raise ObjectRunnersException(
@@ -418,14 +431,14 @@ class RemoteProcess(IObjectRunner):
             )
 
         try:
-            self.runner.stop()
+            self.process.stop()
         except (ValueError, process.ProcessNotStopped):
-            msg = f'Failed to stop: {self.obj}, {self.runner}'
+            msg = f'Failed to stop: {self.obj}, {self.process}'
             logger.error(msg, exc_info=True)
             raise ObjectRunnersException(msg)
         
         self.is_stopped = True
-        # logger.info(f'Stopped successfully: {self.obj}, {self.runner}')
+        # logger.info(f'Stopped successfully: {self.obj}, {self.process}')
 
 
     def get_status(self):
@@ -433,7 +446,7 @@ class RemoteProcess(IObjectRunner):
         False - idle
         True - running
         """
-        return get_status(self.is_started, self.runner)
+        return get_status(self.is_started, self.process)
 
 
     # TODO: The implementation is not finished
@@ -442,7 +455,7 @@ class RemoteProcess(IObjectRunner):
         Raises:
             ObjectRunnersException
         """
-        logger.info(f'Collecting results: {self.obj}, {self.runner}')
+        logger.info(f'Collecting results: {self.obj}, {self.process}')
         
         if not self.is_started:
             raise ObjectRunnersException(
@@ -450,7 +463,7 @@ class RemoteProcess(IObjectRunner):
                 f'Can not collect results.'
             )
 
-        stdout, stderr = self.runner.collect_results()
+        stdout, stderr = self.process.collect_results()
         # TODO: Implement writing stderr, stdout in files (logs folder)
         print(f'stdout: {stdout}')
         print(f'stderr: {stderr}')
