@@ -2,6 +2,7 @@ import logging
 import pathlib
 import time
 
+from srt_utils.enums import Status
 from srt_utils.exceptions import SrtUtilsException
 # from srt_utils.logutils import ContextualLoggerAdapter
 import srt_utils.objects as objects
@@ -314,7 +315,7 @@ class SingleExperimentRunner:
         not_stopped_tasks = 0
 
         for task in self.tasks:
-            if task.obj_runner.get_status():
+            if task.obj_runner.get_status() == Status.running:
                 logging.info(f'Stopping task: {task}')
 
                 try:

@@ -5,6 +5,7 @@ from abc import abstractmethod, ABC
 import fabric
 import paramiko
 
+from srt_utils.enums import Status
 from srt_utils.exceptions import SrtUtilsException
 import srt_utils.objects as objects
 from srt_utils.process import Process, ProcessStatus
@@ -44,29 +45,17 @@ def create_local_directory(dirpath: pathlib.Path):
 
 def get_status(is_started: bool, proc: Process):
     """
-    False - idle
-    True - running
+    TODO
     """
-    # logger.info(f'Getting status: {self.obj}, {self.process}')
-
-    # if not self.is_started:
-    #     raise ValueError(
-    #         f'Process has not been started yet: {self.obj}. '
-    #         f'Can not get status'
-    #     )
-
-    # status, _ = self.process.get_status()
-    # return status
-
     if not is_started:
-        return False
+        return Status.idle
 
     status, _ = proc.get_status()
 
     if status == ProcessStatus.idle:
-        return False
+        return Status.idle
 
-    return True
+    return Status.running
 
 
 class IObjectRunner(ABC):
@@ -116,7 +105,6 @@ class LocalProcess(IObjectRunner):
                 `pathlib.Path` directory path where the results produced by 
                 the object should be copied.
         """
-        # dirpath (on machine where we run the script) where to collect results
         self.obj = obj
         self.collect_results_path = collect_results_path
         self.process = Process(self.obj.make_args())
@@ -127,12 +115,6 @@ class LocalProcess(IObjectRunner):
     @staticmethod
     def _create_directory(dirpath: pathlib.Path):
         create_local_directory(dirpath)
-        # logger.info(f'Creating a directory for saving results: {dirpath}')
-        # if dirpath.exists():
-        #     logger.info('Directory already exists, no need to create')
-        #     return
-        # dirpath.mkdir(parents=True)
-        # logger.info('Created successfully')
 
 
     @classmethod
@@ -159,7 +141,7 @@ class LocalProcess(IObjectRunner):
         if self.is_started:
             raise SrtUtilsException(
                 f'Process has been started already: {self.obj}, {self.process}. '
-                f'Start can not be done.'
+                f'Start can not be done'
             )
 
         if self.obj.dirpath != None:
@@ -167,8 +149,6 @@ class LocalProcess(IObjectRunner):
         
         self.process.start()
         self.is_started = True
-
-        # logger.info(f'Started successfully: {self.obj}, {self.process}')
 
 
     def stop(self):
@@ -181,24 +161,18 @@ class LocalProcess(IObjectRunner):
         if not self.is_started:
             raise SrtUtilsException(
                 f'Process has not been started yet: {self.obj}. '
-                f'Stop can not be done.'
+                f'Stop can not be done'
             )
 
         if self.is_stopped:
-            logger.info('Process has been stopped already. Nothing to do.')
+            logger.info('Process has been stopped already. Nothing to do')
             return
 
         self.process.stop()
         self.is_stopped = True
-        
-        # logger.info(f'Stopped successfully: {self.obj}, {self.process}')
 
 
     def get_status(self):
-        """ 
-        False - idle
-        True - running
-        """
         return get_status(self.is_started, self.process)
 
 
@@ -212,19 +186,14 @@ class LocalProcess(IObjectRunner):
         if not self.is_started:
             raise SrtUtilsException(
                 f'Process has not been started yet: {self.obj}. '
-                'Can not collect results.'
+                'Can not collect results'
             )
 
         if not self.is_stopped:
             raise SrtUtilsException(
                 f'Process has not been stopped yet: {self.obj}, {self.process}. '
-                'Can not collect results.'
+                'Can not collect results'
             )
-
-        # TODO: Implement writing stderr, stdout in files (logs folder)
-        stdout, stderr = self.process.collect_results()
-        print(f'stdout: {stdout}')
-        print(f'stderr: {stderr}')
 
         # It's expected that at this moment directory 
         # self.collect_results_path already exists, because it is created 
@@ -245,6 +214,7 @@ class LocalProcess(IObjectRunner):
         # an output file produced. However it does not mean that the file
         # was created successfully, that's why we check whether the filepath exists.
         if not self.obj.filepath.exists():
+            stdout, stderr = self.process.collect_results()
             raise SrtUtilsException(
                 'There was no output file produced by the object: '
                 f'{self.obj}, nothing to collect. Process stdout: '
@@ -442,10 +412,6 @@ class RemoteProcess(IObjectRunner):
 
 
     def get_status(self):
-        """ 
-        False - idle
-        True - running
-        """
         return get_status(self.is_started, self.process)
 
 
