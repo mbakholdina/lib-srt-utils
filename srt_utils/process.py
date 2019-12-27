@@ -1,11 +1,11 @@
-import enum
 import logging
 import signal
 import subprocess
 import sys
 import time
+import typing
 
-from srt_utils.enums import AutoName
+from srt_utils.enums import AutoName, Status
 from srt_utils.exceptions import SrtUtilsException
 
 
@@ -15,41 +15,50 @@ logger = logging.getLogger(__name__)
 SSH_CONNECTION_TIMEOUT = 10
 
 
-# TODO: Move to enums
-@enum.unique
-class ProcessStatus(AutoName):
-    idle = enum.auto()
-    running = enum.auto()
-
-
-class ProcessNotTerminated(Exception):
-    pass
-
-class ProcessNotKilled(Exception):
-    pass
-
-
 class Process:
-    """ TODO """
 
-    def __init__(self, args, via_ssh: bool=False):
+    def __init__(self, args: typing.List[str], via_ssh: bool=False):
+        """
+        Helper class to work with Python `subprocess` module.
+
+        Attributes:
+            args:
+                The arguments used to launch the process.
+            via_ssh:
+                True/False depending on whether the arguments `args` contain
+                SSH related ones.
+        """
         self.args = args
         # TODO: change via_ssh to timeouts (for start, for stop - depending on object and 
         # whether it is started via ssh or locally)
         self.via_ssh = via_ssh
-
         self.process = None
         self.id = None
         self.is_started = False
-        # TODO: is_stopped ?
+        self.is_stopped = False
 
-    
+
     def __str__(self):
         return f'process id {self.id}'
 
 
+    @property
+    def status(self):
+        if self.process == None:
+            return (Status.idle, None)
+
+        if not self.is_started:
+            return (Status.idle, None)
+
+        returncode = self.process.poll()
+        status = Status.running if returncode is None else Status.idle
+        return (status, returncode)
+
+
     def start(self):
-        """ 
+        """
+        Start process.
+
         Raises:
             SrtUtilsException
         """
@@ -58,7 +67,7 @@ class Process:
         if self.is_started:
             raise SrtUtilsException(
                 f'Process has been started already: {self.id}. '
-                f'Start can not be done.'
+                f'Start can not be done'
             )
 
         try:
@@ -81,9 +90,11 @@ class Process:
                     #universal_newlines=False,
                     bufsize=1
                 )
-            self.is_started = True
-        except OSError as e:
-            raise SrtUtilsException(f'Process not started: {self.args}. Error: {e}')
+                self.is_started = True
+        except OSError as error:
+            raise SrtUtilsException(
+                f'Process has not been started: {self.args}. Reason: {error}'
+            )
     
         # TODO: Adjust timers
         # Check that the process has started successfully and has not terminated
@@ -100,70 +111,84 @@ class Process:
             # transmission.
             time.sleep(5)
 
-        is_running, returncode = self.get_status()
-        if not is_running:
+        status, returncode = self.status
+        if status == Status.idle:
             raise SrtUtilsException(
-                f'Process not started: {self.args}, returncode: {returncode}, '
-                f'stdout: {self.process.stdout.readlines()}, '
+                f'Process has not been started: {self.args}, returncode: '
+                f'{returncode}, stdout: {self.process.stdout.readlines()}, '
                 f'stderr: {self.process.stderr.readlines()}'
             )
-    
+
         self.id = self.process.pid
-        # logger.debug(f'Started successfully: {self.id}')
 
 
     def _terminate(self):
+        """
+        Terminate process.
+
+        Raises:
+            SrtUtilsException
+        """
         logger.debug(f'Terminating process: {self.id}')
 
         if not self.is_started:
-            raise ValueError(
+            raise SrtUtilsException(
                 f'Process has not been started yet. '
                 f'Terminate can not be done'
             )
 
-        status, _ = self.get_status()
-        if status == ProcessStatus.idle: 
-            logger.debug(f'Process is idle, no need to terminate')
+        if self.is_stopped:
+            return
+
+        status, _ = self.status
+        if status == Status.idle: 
             return
         
         sig = signal.CTRL_C_EVENT if sys.platform == 'win32' else signal.SIGINT
         self.process.send_signal(sig)
         for i in range(3):
             time.sleep(1)
-            status, _ = self.get_status()
-            if status == ProcessStatus.idle: 
-                logger.debug(f'Terminated successfully: {self.id}')
+            status, _ = self.status
+            if status == Status.idle:
                 return
 
-        raise ProcessNotTerminated(f'{self.id}')
+        raise SrtUtilsException(f'Process has not been terminated: {self.id}')
 
 
     def _kill(self):
+        """
+        Kill process.
+
+        Raises:
+            SrtUtilsException
+        """
         logger.debug(f'Killing process: {self.id}')
 
         if not self.is_started:
-            raise ValueError(
+            raise SrtUtilsException(
                 f'Process has not been started yet. '
                 f'Kill can not be done'
             )
 
-        status, _ = self.get_status()
-        if status == ProcessStatus.idle: 
-            logger.debug(f'Process is idle, no need to kill')
+        if self.is_stopped:
+            return
+
+        status, _ = self.status
+        if status == Status.idle: 
             return
 
         self.process.kill()
         time.sleep(1)
 
-        status, _ = self.get_status()
-        if status == ProcessStatus.running:
-            raise ProcessNotKilled(f'{self.process.pid}')
-            
-        logger.debug(f'Killed successfully: {self.id}')
+        status, _ = self.status
+        if status == Status.running:
+            raise SrtUtilsException(f'Process has not been killed: {self.id}')
 
 
     def stop(self):
-        """ 
+        """
+        Stop process.
+
         Raises:
             SrtUtilsException
         """
@@ -175,8 +200,8 @@ class Process:
                 f'Stop can not be done'
             )
 
-        # if self.is_stopped:
-        #     return
+        if self.is_stopped:
+            return
 
         # NOTE: There is a problem with terminating processes which use SSH 
         # to run a command on a remote server. The problem is in SSH not 
@@ -195,11 +220,10 @@ class Process:
         # FIXME: Signals may not work on Windows properly. Might be useful
         # https://stefan.sofa-rockers.org/2013/08/15/handling-sub-process-hierarchies-python-linux-os-x/
 
-        # TODO: Change this logic to returning True/False instead of exceptions
         try:
             self._terminate()
-        except ProcessNotTerminated:
-            logger.error('Failed to terminate process', exc_info=True)
+        except SrtUtilsException:
+            logger.error(f'Failed to terminate process: {self.id}')
 
             # TODO: (For future) Experiment with this more. If stransmit will not 
             # stop after several terminations, there is a problem, and kill() will
@@ -210,47 +234,26 @@ class Process:
 
             try:
                 self._kill()
-            except ProcessNotKilled:
-                logger.error('Failed to kill process', exc_info=True)
-                raise SrtUtilsException(f'Process not stopped: {self.id}')
+            except SrtUtilsException:
+                logger.error(f'Failed to kill process: {self.id}')
+                raise SrtUtilsException(
+                    f'Process has not been stopped: {self.id}'
+                )
 
-        logger.debug(f'Stopped successfully: {self.id}')
-
-
-    def get_status(self):
-        """ 
-        Returns:
-            A tuple of (result, returncode) where 
-            - is_running is equal to True if the process is running and False if
-            the process has terminated,
-            - returncode is None if the process is running and the actual value 
-            of returncode if the process has terminated.
-
-        Raises:
-            SrtUtilsException
-        """
-        # TODO: If process is None, throw exception
-
-        if not self.is_started:
-            raise SrtUtilsException(
-                f'Process has not been started yet. '
-                f'Can not get status'
-            )
-
-        returncode = self.process.poll()
-        status = ProcessStatus.running if returncode is None else ProcessStatus.idle
-        return (status, returncode)
+        self.is_stopped = True
 
 
     def collect_results(self):
         """
+        Collect process results: stderr, stdout.
+
         Raises:
             SrtUtilsException
         """
         if not self.is_started:
             raise SrtUtilsException(
                 f'Process has not been started yet. '
-                f'Can not collect results.'
+                f'Can not collect results'
             )
 
         stdout = self.process.stdout.readlines()

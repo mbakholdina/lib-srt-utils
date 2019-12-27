@@ -8,7 +8,7 @@ import paramiko
 from srt_utils.enums import Status
 from srt_utils.exceptions import SrtUtilsException
 import srt_utils.objects as objects
-from srt_utils.process import Process, ProcessStatus
+from srt_utils.process import Process
 
 
 logger = logging.getLogger(__name__)
@@ -50,9 +50,9 @@ def get_status(is_started: bool, proc: Process):
     if not is_started:
         return Status.idle
 
-    status, _ = proc.get_status()
+    status, _ = proc.status
 
-    if status == ProcessStatus.idle:
+    if status == Status.idle:
         return Status.idle
 
     return Status.running
