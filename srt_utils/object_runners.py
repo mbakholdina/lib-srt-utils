@@ -4,6 +4,7 @@ from abc import abstractmethod, ABC
 
 import fabric
 import paramiko
+from patchwork.files import exists
 
 from srt_utils.enums import Status
 from srt_utils.exceptions import SrtUtilsException
@@ -30,11 +31,6 @@ SSH_COMMON_ARGS = [
 ]
 
 
-# TODO: Delete
-class ObjectRunnersException(Exception):
-    pass
-
-
 def create_local_directory(dirpath: pathlib.Path):
     logger.info(f'Creating a local directory for saving/copying object results: {dirpath}')
     if dirpath.exists():
@@ -56,6 +52,41 @@ def get_status(is_started: bool, proc: Process):
         return Status.idle
 
     return Status.running
+
+
+def before_collect_results_checks(
+    is_started: bool,
+    is_stopped: bool,
+    collect_results_path: pathlib.Path,
+    obj: objects.IObject,
+    process: Process
+):
+    if not is_started:
+        raise SrtUtilsException(
+            f'Process has not been started yet: {obj}. '
+            'Can not collect results'
+        )
+
+    if not is_stopped:
+        raise SrtUtilsException(
+            f'Process has not been stopped yet: {obj}, {process}. '
+            'Can not collect results'
+        )
+
+    # It's expected that at this moment directory 
+    # self.collect_results_path already exists, because it is created 
+    # in SingleExperimentRunner class
+    if not collect_results_path.exists():
+        raise SrtUtilsException(
+            'There was no directory for collecting results created: '
+            f'{collect_results_path}. Can not collect results'
+        )
+
+    # If an object has filepath equal to None, it means there should be
+    # no output file produced
+    if obj.filepath == None:
+        logger.info('There was no output file expected, nothing to collect')
+        return
 
 
 class IObjectRunner(ABC):
@@ -165,7 +196,6 @@ class LocalProcess(IObjectRunner):
             )
 
         if self.is_stopped:
-            logger.info('Process has been stopped already. Nothing to do')
             return
 
         self.process.stop()
@@ -182,33 +212,14 @@ class LocalProcess(IObjectRunner):
             SrtUtilsException
         """
         logger.info(f'Collecting object results: {self.obj}, {self.process}')
-        
-        if not self.is_started:
-            raise SrtUtilsException(
-                f'Process has not been started yet: {self.obj}. '
-                'Can not collect results'
-            )
 
-        if not self.is_stopped:
-            raise SrtUtilsException(
-                f'Process has not been stopped yet: {self.obj}, {self.process}. '
-                'Can not collect results'
-            )
-
-        # It's expected that at this moment directory 
-        # self.collect_results_path already exists, because it is created 
-        # in SingleExperimentRunner class
-        if not self.collect_results_path.exists():
-            raise SrtUtilsException(
-                'There was no directory for collecting results created: '
-                f'{self.collect_results_path}. Can not collect results'
-            )
-
-        # If an object has filepath equal to None, it means there should be
-        # no output file produced
-        if self.obj.filepath == None:
-            logger.info('There was no output file expected, nothing to collect')
-            return
+        before_collect_results_checks(
+            self.is_started,
+            self.is_stopped,
+            self.collect_results_path,
+            self.obj,
+            self.process
+        )
 
         # If an object has filepath defined, it means there should be 
         # an output file produced. However it does not mean that the file
@@ -223,10 +234,7 @@ class LocalProcess(IObjectRunner):
 
         # Create 'local' folder to copy produced by the object file 
         # (inside self.collect_results_path directory)
-        filename = self.obj.filepath.name
-        source = self.obj.filepath
         destination_dir = self.collect_results_path / 'local'
-        destination = destination_dir / filename
         create_local_directory(destination_dir)
 
         # The code below will raise a FileExistsError if destination already exists. 
@@ -240,6 +248,11 @@ class LocalProcess(IObjectRunner):
         # we catch FileExistsError exception. That's why it is necessary 
         # to make sure that the file names for different tasks are unique.
         logger.info(f'Copying object results into: {destination_dir}')
+
+        filename = self.obj.filepath.name
+        source = self.obj.filepath
+        destination = destination_dir / filename
+
         try:
             with destination.open(mode='xb') as fid:
                 fid.write(source.read_bytes())
@@ -281,18 +294,25 @@ class RemoteProcess(IObjectRunner):
 
 
     @staticmethod
-    def _create_directory(dirpath: str, username: str, host: str, classname: str):
+    def _create_directory(
+        dirpath: str,
+        username: str,
+        host: str,
+        classname: str
+    ):
         """
+        Create directory on a remote machine via SSH.
+
+        Attributes:
+            TODO
+
         Raises:
-            ObjectRunnersException
+            SrtUtilsException
         """
         logger.info(
-            f'[{classname}] Creating a directory for saving '
-            f'results remotely via SSH: {dirpath}'
+            f'[{classname}] Creating a directory for saving results remotely '
+            f'via SSH. Username: {username}, host: {host}, dirpath: {dirpath}'
         )
-
-        # TODO: One final message that directory has not been 
-        # created in case of not success
 
         try:
             # FIXME: By default Paramiko will attempt to connect to a running 
@@ -301,35 +321,23 @@ class RemoteProcess(IObjectRunner):
             # disabled under condition that password is not configured via 
             # connect_kwargs.password
             with fabric.Connection(host=host, user=username) as c:
-                # result = c.run(f'rm -rf {dirpath}')
-                # if result.exited != 0:
-                #     logger.info(f'Not deleted: {result}')
-                #     return
                 result = c.run(f'mkdir -p {dirpath}')
-                if result.exited != 0:
-                    logger.error(
-                        f'[{classname}] Directory has not been '
-                        f'created: {dirpath}'
-                    )
-                    # TODO: To raise an axception here is bad
-                    raise ObjectRunnersException(
-                        f'[{classname}] Username: {username}, '
-                        f'host: {host}, dirpath: {dirpath}'
-                    )
         except paramiko.ssh_exception.SSHException as error:
-            # NOTE: To catch this exception, just do not run ssh-agent before the experiment
-            msg =   f'[{classname}] Exception occured ({error.__class__.__name__}): {error}. ' \
-                    'Check that the ssh-agent has been started.'
-            logger.error(msg)
-            raise ObjectRunnersException(msg)
+            raise SrtUtilsException(
+                f'Directory has not been created: {dirpath}. Exception '
+                f'occured ({error.__class__.__name__}): {error}. Check that '
+                'ssh-agent has been started before running the script'
+            )
         except TimeoutError as error:
-            msg =   f'[{classname}] Exception occured ({error.__class__.__name__}): {error}. ' \
-                    'Check that IP address of the remote machine is correct and the ' \
-                    'machine is not down.'
-            logger.error(msg)
-            raise ObjectRunnersException(msg)
+            raise SrtUtilsException(
+                f'Directory has not been created: {dirpath}. Exception '
+                f'occured ({error.__class__.__name__}): {error}. Check that '
+                'IP address of the remote machine is correct and the '
+                'machine is not down'
+            )
 
-        # logger.info(f'[{classname}] Created successfully')
+        if result.exited != 0:
+            raise SrtUtilsException(f'Directory has not been created: {dirpath}')
 
 
     @classmethod
@@ -356,16 +364,14 @@ class RemoteProcess(IObjectRunner):
     def start(self):
         """ 
         Raises:
-            ObjectRunnersException
+            SrtUtilsException
         """
         logger.info(f'Starting object remotely via SSH: {self.obj}')
 
-        msg = f'Failed to start object: {self.obj}'
-
         if self.is_started:
-            raise ObjectRunnersException(
-                f'Process has been started already: {self.obj}. '
-                f'Start can not be done.'
+            raise SrtUtilsException(
+                f'Process has been started already: {self.obj}, {self.process}. '
+                f'Start can not be done'
             )
 
         if self.obj.dirpath != None:
@@ -376,39 +382,28 @@ class RemoteProcess(IObjectRunner):
                 self.__class__.__name__
             )
 
-        try:
-            self.process.start()
-        except (ValueError, process.ProcessNotStarted):
-            logger.error(msg, exc_info=True)
-            raise ObjectRunnersException(msg)
-        
+        self.process.start()
         self.is_started = True
-
-        # logger.info(f'Started successfully: {self.obj}, {self.process}')
 
 
     def stop(self):
         """ 
         Raises:
-            ObjectRunnersException
+            SrtUtilsException
         """
         logger.info(f'Stopping object remotely via SSH: {self.obj}, {self.process}')
 
         if not self.is_started:
-            raise ObjectRunnersException(
+            raise SrtUtilsException(
                 f'Process has not been started yet: {self.obj}. '
-                f'Stop can not be done.'
+                f'Stop can not be done'
             )
 
-        try:
-            self.process.stop()
-        except (ValueError, process.ProcessNotStopped):
-            msg = f'Failed to stop: {self.obj}, {self.process}'
-            logger.error(msg, exc_info=True)
-            raise ObjectRunnersException(msg)
-        
+        if self.is_stopped:
+            return
+
+        self.process.stop()
         self.is_stopped = True
-        # logger.info(f'Stopped successfully: {self.obj}, {self.process}')
 
 
     def get_status(self):
@@ -419,47 +414,51 @@ class RemoteProcess(IObjectRunner):
     def collect_results(self):
         """
         Raises:
-            ObjectRunnersException
+            SrtUtilsException
         """
-        logger.info(f'Collecting results: {self.obj}, {self.process}')
-        
-        if not self.is_started:
-            raise ObjectRunnersException(
-                f'Process has not been started yet: {self.obj}. '
-                f'Can not collect results.'
-            )
+        logger.info(f'Collecting object results: {self.obj}, {self.process}')
 
-        stdout, stderr = self.process.collect_results()
-        # TODO: Implement writing stderr, stdout in files (logs folder)
-        print(f'stdout: {stdout}')
-        print(f'stderr: {stderr}')
+        before_collect_results_checks(
+            self.is_started,
+            self.is_stopped,
+            self.collect_results_path,
+            self.obj,
+            self.process
+        )
 
-        # ? or dirpath is None - there can be multiple files
-        if self.obj.filepath is None:
-            return
+        # TODO: Check this remotely via SSH
+        # If an object has filepath defined, it means there should be 
+        # an output file produced. However it does not mean that the file
+        # was created successfully, that's why we check whether the filepath exists.
+        with fabric.Connection(host=self.host, user=self.username) as c:
+            if not exists(c, self.obj.filepath):
+                stdout, stderr = self.process.collect_results()
+                raise SrtUtilsException(
+                    'There was no output file produced by the object: '
+                    f'{self.obj}, nothing to collect. Process stdout: '
+                    f'{stdout}. Process stderr: {stderr}'
+                )
 
-        print(self.obj.dirpath)
-        print(self.obj.filepath)
+        # Create 'username@host' folder to copy produced by the object file 
+        # (inside self.collect_results_path directory)
+        destination_dir = self.collect_results_path / f'{self.username}@{self.host}'
+        create_local_directory(destination_dir)
 
-        # TODO: All the checks as above
+        logger.info(f'Copying object results into: {destination_dir}')
 
-        # Create directory on the local machine
-        # TODO: redundant code
-        dirpath = pathlib.Path(f'{self.username}@{self.host}')
-        print(dirpath)
-        logger.info(f'Creating a directory for loading the results: {dirpath}')
-        if dirpath.exists():
-            logger.info('Directory already exists, no need to create')
-            # return
-        else:
-            dirpath.mkdir(parents=True)
-            logger.info('Created successfully')
+        filename = self.obj.filepath.name
+        source = self.obj.filepath
+        destination = destination_dir / filename
+        print(destination)
 
         with fabric.Connection(host=self.host, user=self.username) as c:
             # the folder tmp_5 should be there
             # result = c.get(self.obj.filepath, '/Users/msharabayko/projects/srt/lib-srt-utils/tmp_5/uhu.pcapng')
             # result = c.get(self.obj.filepath, 'tmp_5/olala.pcapng')
-            result = c.get(self.obj.filepath, f'{dirpath}/olala.pcapng')
+
+            # result = c.get(self.obj.filepath, f'{dirpath}/olala.pcapng')
+
+            result = c.get(source, destination)
             print(result)
 
             # TODO: Implement
