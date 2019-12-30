@@ -44,6 +44,22 @@ class Process:
 
     @property
     def status(self):
+        """
+        Get process status.
+
+        Returns:
+            A tuple of status and returncode depending on process status.
+
+        Possible combinations:
+            (Status.idle, None):
+                If the process has not been started yet,
+            (Status.running, None):
+                If the process has been started successfully and still running
+                at the moment of getting status,
+            (Status.idle, some returncode):
+                If the process has been started successfully, but is not
+                running at the moment of getting status.
+        """
         if self.process == None:
             return (Status.idle, None)
 
@@ -67,7 +83,7 @@ class Process:
         if self.is_started:
             raise SrtUtilsException(
                 f'Process has been started already: {self.id}. '
-                f'Start can not be done'
+                'Start can not be done'
             )
 
         try:
@@ -133,8 +149,7 @@ class Process:
 
         if not self.is_started:
             raise SrtUtilsException(
-                f'Process has not been started yet. '
-                f'Terminate can not be done'
+                'Process has not been started yet. Terminate can not be done'
             )
 
         if self.is_stopped:
@@ -166,8 +181,7 @@ class Process:
 
         if not self.is_started:
             raise SrtUtilsException(
-                f'Process has not been started yet. '
-                f'Kill can not be done'
+                'Process has not been started yet. Kill can not be done'
             )
 
         if self.is_stopped:
@@ -196,8 +210,7 @@ class Process:
 
         if not self.is_started:
             raise SrtUtilsException(
-                f'Process has not been started yet. '
-                f'Stop can not be done'
+                'Process has not been started yet. Stop can not be done'
             )
 
         if self.is_stopped:
