@@ -66,6 +66,11 @@ def before_collect_results_checks(
 
 
 class IObjectRunner(ABC):
+    @property
+    @abstractmethod
+    def status(self):
+        pass
+
     @classmethod
     @abstractmethod
     def from_config(cls, obj: objects.IObject, config: dict):
@@ -79,10 +84,6 @@ class IObjectRunner(ABC):
 
     @abstractmethod
     def stop(self):
-        pass
-
-    @abstractmethod
-    def get_status(self):
         pass
 
     @abstractmethod
@@ -111,6 +112,11 @@ class LocalProcess(IObjectRunner):
         self.collect_results_path = collect_results_path
         self.process = Process(self.obj.make_args())
 
+
+    @property
+    def status(self):
+        status, _ = self.process.status
+        return status
 
 
     @staticmethod
@@ -157,7 +163,6 @@ class LocalProcess(IObjectRunner):
         self.process.start()
 
 
-
     def stop(self):
         """ 
         Raises:
@@ -165,11 +170,6 @@ class LocalProcess(IObjectRunner):
         """
         logger.info(f'Stopping object on-premises: {self.obj}, {self.process}')
         self.process.stop()
-
-
-    def get_status(self):
-        status, _ = self.process.status
-        return status
 
 
     def collect_results(self):
@@ -261,6 +261,12 @@ class RemoteProcess(IObjectRunner):
         args += obj_args
 
         self.process = Process(args, True)
+
+
+    @property
+    def status(self):
+        status, _ = self.process.status
+        return status
 
 
     @staticmethod
@@ -355,11 +361,6 @@ class RemoteProcess(IObjectRunner):
         """
         logger.info(f'Stopping object remotely via SSH: {self.obj}, {self.process}')
         self.process.stop()
-
-
-    def get_status(self):
-        status, _ = self.process.status
-        return status
 
 
     def collect_results(self):

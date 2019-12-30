@@ -263,10 +263,6 @@ class SingleExperimentRunner:
         self.is_stopped = True
 
 
-    def get_status(self):
-        pass
-
-
     def collect_results(self):
         """
         Collect experiment results.
@@ -313,7 +309,7 @@ class SingleExperimentRunner:
         not_stopped_tasks = 0
 
         for task in self.tasks:
-            if task.obj_runner.get_status() == Status.running:
+            if task.obj_runner.status == Status.running:
                 logging.info(f'Stopping task: {task}')
 
                 try:
