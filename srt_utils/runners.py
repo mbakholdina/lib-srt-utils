@@ -2,6 +2,7 @@ import logging
 import pathlib
 import time
 
+from srt_utils.common import create_local_directory
 from srt_utils.enums import Status
 from srt_utils.exceptions import SrtUtilsException
 # from srt_utils.logutils import ContextualLoggerAdapter
@@ -44,7 +45,6 @@ class SimpleFactory:
 
 ### ITestRunner -> SingleExperimentRunner, TestRunner, CombinedTestRunner ###
 # The methods will be similar to IRunner
-
 
 class Task:
 
@@ -148,7 +148,7 @@ class SingleExperimentRunner:
 
 
     @staticmethod
-    def _create_directory(dirpath: pathlib.Path, classname: str):
+    def _create_directory(dirpath: pathlib.Path):
         """
         Create a local directory for saving experiment results.
 
@@ -156,19 +156,25 @@ class SingleExperimentRunner:
             SrtUtilsException
         """
         logger.info(
-            f'[{classname}] Creating a local directory for saving experiment '
-            f'results: {dirpath}'
+            '[SingleExperimentRunner] Creating a local directory for saving '
+            f'experiment results: {dirpath}'
         )
 
-        if dirpath.exists():
+        try:
+            created = create_local_directory(dirpath)
+        except Exception as error:
+            raise SrtUtilsException(
+                f'Directory has not been created: {dirpath}. Exception '
+                f'occured ({error.__class__.__name__}): {error}'
+            )
+
+        if not created:
             raise SrtUtilsException(
                 'Directory for saving experiment results already exists: '
                 f'{dirpath}. Please use non-existing directory name and '
                 'start the experiment again. Existing directory contents '
                 'will not be deleted'
             )
-
-        dirpath.mkdir(parents=True)
 
 
     @classmethod
@@ -205,7 +211,7 @@ class SingleExperimentRunner:
                 'Start can not be done.'
             )
 
-        self._create_directory(self.collect_results_path, type(self).__name__)
+        self._create_directory(self.collect_results_path)
 
         for task in self.tasks:
             logging.info(f'Starting task: {task}')

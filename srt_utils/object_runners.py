@@ -6,6 +6,7 @@ import fabric
 import paramiko
 from patchwork.files import exists
 
+from srt_utils.common import create_local_directory
 from srt_utils.enums import Status
 from srt_utils.exceptions import SrtUtilsException
 import srt_utils.objects as objects
@@ -29,14 +30,6 @@ SSH_COMMON_ARGS = [
     '-o', 'BatchMode=yes',
     '-o', f'ConnectTimeout={SSH_CONNECTION_TIMEOUT}',
 ]
-
-
-def create_local_directory(dirpath: pathlib.Path):
-    logger.info(f'Creating a local directory for saving/copying object results: {dirpath}')
-    if dirpath.exists():
-        logger.info(f'Directory already exists, no need to create: {dirpath}')
-        return
-    dirpath.mkdir(parents=True, exist_ok=True)
 
 
 def get_status(is_started: bool, proc: Process):
@@ -90,11 +83,6 @@ def before_collect_results_checks(
 
 
 class IObjectRunner(ABC):
-    @staticmethod
-    @abstractmethod
-    def _create_directory(dirpath: pathlib.Path):
-        pass
-
     @classmethod
     @abstractmethod
     def from_config(cls, obj: objects.IObject, config: dict):
@@ -145,7 +133,24 @@ class LocalProcess(IObjectRunner):
 
     @staticmethod
     def _create_directory(dirpath: pathlib.Path):
-        create_local_directory(dirpath)
+        logger.info(
+            '[LocalProcess] Creating a local directory for saving '
+            f'object results: {dirpath}'
+        )
+
+        try:
+            created = create_local_directory(dirpath)
+        except Exception as error:
+            raise SrtUtilsException(
+                f'Directory has not been created: {dirpath}. Exception '
+                f'occured ({error.__class__.__name__}): {error}'
+            )
+
+        if not created:
+            logger.info(
+                '[LocalProcess] Directory already exists, no need to '
+                f'create: {dirpath}'
+            )
 
 
     @classmethod
@@ -235,6 +240,10 @@ class LocalProcess(IObjectRunner):
         # Create 'local' folder to copy produced by the object file 
         # (inside self.collect_results_path directory)
         destination_dir = self.collect_results_path / 'local'
+        logger.info(
+            'Creating a local directory for copying object '
+            f'results: {destination_dir}'
+        )
         create_local_directory(destination_dir)
 
         # The code below will raise a FileExistsError if destination already exists. 
@@ -297,8 +306,7 @@ class RemoteProcess(IObjectRunner):
     def _create_directory(
         dirpath: str,
         username: str,
-        host: str,
-        classname: str
+        host: str
     ):
         """
         Create directory on a remote machine via SSH.
@@ -310,8 +318,9 @@ class RemoteProcess(IObjectRunner):
             SrtUtilsException
         """
         logger.info(
-            f'[{classname}] Creating a directory for saving results remotely '
-            f'via SSH. Username: {username}, host: {host}, dirpath: {dirpath}'
+            '[RemoteProcess] Creating a directory for saving object results '
+            f'remotely via SSH. Username: {username}, host: {host}, '
+            f'dirpath: {dirpath}'
         )
 
         try:
@@ -378,8 +387,7 @@ class RemoteProcess(IObjectRunner):
             self._create_directory(
                 self.obj.dirpath,
                 self.username,
-                self.host,
-                self.__class__.__name__
+                self.host
             )
 
         self.process.start()
@@ -440,6 +448,10 @@ class RemoteProcess(IObjectRunner):
         # Create 'username@host' folder to copy produced by the object file 
         # (inside self.collect_results_path directory)
         destination_dir = self.collect_results_path / f'{self.username}@{self.host}'
+        logger.info(
+            'Creating a local directory for copying object '
+            f'results: {destination_dir}'
+        )
         create_local_directory(destination_dir)
 
         logger.info(f'Copying object results into: {destination_dir}')
@@ -452,7 +464,6 @@ class RemoteProcess(IObjectRunner):
             # http://docs.fabfile.org/en/2.3/api/transfer.html
             with fabric.Connection(host=self.host, user=self.username) as c:
                 result = c.get(source, destination)
-                print(result)
         except OSError as error:
             raise SrtUtilsException(
                 f'Object results have not been collected: {self.obj.filepath}'
