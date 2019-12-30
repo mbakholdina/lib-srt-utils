@@ -207,8 +207,7 @@ class SingleExperimentRunner:
 
         if self.is_started:
             raise SrtUtilsException(
-                'Experiment has been started already. '
-                'Start can not be done.'
+                'Experiment has been started already. Start can not be done'
             )
 
         self._create_directory(self.collect_results_path)
@@ -236,8 +235,7 @@ class SingleExperimentRunner:
 
         if not self.is_started:
             raise SrtUtilsException(
-                'Experiment has not been started yet. '
-                'Stop can not be done.'
+                'Experiment has not been started yet. Stop can not be done'
             )
 
         if self.is_stopped:
@@ -266,7 +264,7 @@ class SingleExperimentRunner:
                     time.sleep(sleep_after_stop)
 
         if not_stopped_tasks != 0:
-            raise SrtUtilsException('Not all the tasks have been stopped.')
+            raise SrtUtilsException('Not all the tasks have been stopped')
 
         self.is_stopped = True
 
@@ -286,16 +284,14 @@ class SingleExperimentRunner:
 
         if not self.is_started:
             raise SrtUtilsException(
-                'Experiment has not been started yet. '
-                'Can not collect results.'
+                'Experiment has not been started yet. Can not collect results'
             )
 
         # This is done to prevent the situation when the experiment is still 
         # running and we are trying to collect results before stopping it
         if not self.is_stopped:
             raise SrtUtilsException(
-                'Experiment is still running. '
-                'Can not collect results.'
+                'Experiment is still running. Can not collect results'
             )
 
         for task in self.tasks:
@@ -305,7 +301,9 @@ class SingleExperimentRunner:
             try:
                 task.obj_runner.collect_results()
             except SrtUtilsException as error:
-                logger.error(f'Failed to collect task results: {task}. Reason: {error}')
+                logger.error(
+                    f'Failed to collect task results: {task}. Reason: {error}'
+                )
                 continue
 
 
@@ -317,7 +315,7 @@ class SingleExperimentRunner:
         Raises:
             SrtUtilsException
         """
-        logger.info('Cleaning up')
+        logger.info('Cleaning up after experiment')
         not_stopped_tasks = 0
 
         for task in self.tasks:
@@ -327,16 +325,24 @@ class SingleExperimentRunner:
                 try:
                     task.obj_runner.stop()
                 except SrtUtilsException as error:
-                    logger.error(f'Failed to stop task: {task}, retrying to stop again. Reason: {error}')
+                    logger.error(
+                        f'Failed to stop task: {task}, retrying to stop '
+                        f'again. Reason: {error}'
+                    )
                     
                     try:
                         task.obj_runner.stop()
                     except SrtUtilsException as error:
-                        logger.error(f'Failed to stop task on the second try: {task}. Reason: {error}')
+                        logger.error(
+                            f'Failed to stop task on the second try: {task}. '
+                            f'Reason: {error}'
+                        )
                         not_stopped_tasks += 1
                         continue
 
         if not_stopped_tasks != 0:
-            raise SrtUtilsException('Not all the tasks have been stopped during cleaning up.')
+            raise SrtUtilsException(
+                'Not all the tasks have been stopped during cleaning up'
+            )
 
         self.is_stopped = True
