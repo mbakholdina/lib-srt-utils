@@ -160,13 +160,7 @@ class SingleExperimentRunner:
             f'experiment results: {dirpath}'
         )
 
-        try:
-            created = create_local_directory(dirpath)
-        except Exception as error:
-            raise SrtUtilsException(
-                f'Directory has not been created: {dirpath}. Exception '
-                f'occured ({error.__class__.__name__}): {error}'
-            )
+        created = create_local_directory(dirpath)
 
         if not created:
             raise SrtUtilsException(
