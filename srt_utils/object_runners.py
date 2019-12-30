@@ -32,35 +32,18 @@ SSH_COMMON_ARGS = [
 ]
 
 
-def get_status(is_started: bool, proc: Process):
-    """
-    TODO
-    """
-    if not is_started:
-        return Status.idle
-
-    status, _ = proc.status
-
-    if status == Status.idle:
-        return Status.idle
-
-    return Status.running
-
-
 def before_collect_results_checks(
-    is_started: bool,
-    is_stopped: bool,
-    collect_results_path: pathlib.Path,
     obj: objects.IObject,
-    process: Process
+    process: Process,
+    collect_results_path: pathlib.Path
 ):
-    if not is_started:
+    if not process.is_started:
         raise SrtUtilsException(
             f'Process has not been started yet: {obj}. '
             'Can not collect results'
         )
 
-    if not is_stopped:
+    if not process.is_stopped:
         raise SrtUtilsException(
             f'Process has not been stopped yet: {obj}, {process}. '
             'Can not collect results'
@@ -127,8 +110,7 @@ class LocalProcess(IObjectRunner):
         self.obj = obj
         self.collect_results_path = collect_results_path
         self.process = Process(self.obj.make_args())
-        self.is_started = False
-        self.is_stopped = False
+
 
 
     @staticmethod
@@ -138,13 +120,7 @@ class LocalProcess(IObjectRunner):
             f'object results: {dirpath}'
         )
 
-        try:
-            created = create_local_directory(dirpath)
-        except Exception as error:
-            raise SrtUtilsException(
-                f'Directory has not been created: {dirpath}. Exception '
-                f'occured ({error.__class__.__name__}): {error}'
-            )
+        created = create_local_directory(dirpath)
 
         if not created:
             logger.info(
@@ -174,17 +150,12 @@ class LocalProcess(IObjectRunner):
         """
         logger.info(f'Starting object on-premises: {self.obj}')
 
-        if self.is_started:
-            raise SrtUtilsException(
-                f'Process has been started already: {self.obj}, {self.process}. '
-                f'Start can not be done'
-            )
 
         if self.obj.dirpath != None:
             self._create_directory(self.obj.dirpath)
-        
+
         self.process.start()
-        self.is_started = True
+
 
 
     def stop(self):
@@ -193,22 +164,12 @@ class LocalProcess(IObjectRunner):
             SrtUtilsException
         """
         logger.info(f'Stopping object on-premises: {self.obj}, {self.process}')
-
-        if not self.is_started:
-            raise SrtUtilsException(
-                f'Process has not been started yet: {self.obj}. '
-                f'Stop can not be done'
-            )
-
-        if self.is_stopped:
-            return
-
         self.process.stop()
-        self.is_stopped = True
 
 
     def get_status(self):
-        return get_status(self.is_started, self.process)
+        status, _ = self.process.status
+        return status
 
 
     def collect_results(self):
@@ -219,11 +180,9 @@ class LocalProcess(IObjectRunner):
         logger.info(f'Collecting object results: {self.obj}, {self.process}')
 
         before_collect_results_checks(
-            self.is_started,
-            self.is_stopped,
-            self.collect_results_path,
             self.obj,
-            self.process
+            self.process,
+            self.collect_results_path
         )
 
         # If an object has filepath defined, it means there should be 
@@ -244,7 +203,12 @@ class LocalProcess(IObjectRunner):
             'Creating a local directory for copying object '
             f'results: {destination_dir}'
         )
-        create_local_directory(destination_dir)
+        created = create_local_directory(destination_dir)
+        if not created:
+            logger.info(
+                'Directory already exists, no need to create: '
+                f'{destination_dir}'
+            )
 
         # The code below will raise a FileExistsError if destination already exists. 
         # Technically, this copies a file. To perform a move, simply delete source 
@@ -297,9 +261,6 @@ class RemoteProcess(IObjectRunner):
         args += obj_args
 
         self.process = Process(args, True)
-
-        self.is_started = False
-        self.is_stopped = False
 
 
     @staticmethod
@@ -377,12 +338,6 @@ class RemoteProcess(IObjectRunner):
         """
         logger.info(f'Starting object remotely via SSH: {self.obj}')
 
-        if self.is_started:
-            raise SrtUtilsException(
-                f'Process has been started already: {self.obj}, {self.process}. '
-                f'Start can not be done'
-            )
-
         if self.obj.dirpath != None:
             self._create_directory(
                 self.obj.dirpath,
@@ -391,7 +346,6 @@ class RemoteProcess(IObjectRunner):
             )
 
         self.process.start()
-        self.is_started = True
 
 
     def stop(self):
@@ -400,22 +354,12 @@ class RemoteProcess(IObjectRunner):
             SrtUtilsException
         """
         logger.info(f'Stopping object remotely via SSH: {self.obj}, {self.process}')
-
-        if not self.is_started:
-            raise SrtUtilsException(
-                f'Process has not been started yet: {self.obj}. '
-                f'Stop can not be done'
-            )
-
-        if self.is_stopped:
-            return
-
         self.process.stop()
-        self.is_stopped = True
 
 
     def get_status(self):
-        return get_status(self.is_started, self.process)
+        status, _ = self.process.status
+        return status
 
 
     def collect_results(self):
@@ -426,11 +370,9 @@ class RemoteProcess(IObjectRunner):
         logger.info(f'Collecting object results: {self.obj}, {self.process}')
 
         before_collect_results_checks(
-            self.is_started,
-            self.is_stopped,
-            self.collect_results_path,
             self.obj,
-            self.process
+            self.process,
+            self.collect_results_path
         )
 
         # If an object has filepath defined, it means there should be 
@@ -452,12 +394,24 @@ class RemoteProcess(IObjectRunner):
             'Creating a local directory for copying object '
             f'results: {destination_dir}'
         )
-        create_local_directory(destination_dir)
+        created = create_local_directory(destination_dir)
+        if not created:
+            logger.info(
+                'Directory already exists, no need to create: '
+                f'{destination_dir}'
+            )
 
         logger.info(f'Copying object results into: {destination_dir}')
         filename = self.obj.filepath.name
         source = self.obj.filepath
         destination = destination_dir / filename
+
+        if destination.exists():
+            raise SrtUtilsException(
+                'The destination file already exists, there might be a '
+                f'file created by the other object: {destination}. File '
+                f'with object results was not copied: {self.obj.filepath}'
+            )
 
         # TODO: Implement copying files using rsync
         try:
