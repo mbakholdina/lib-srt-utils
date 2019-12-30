@@ -410,7 +410,6 @@ class RemoteProcess(IObjectRunner):
         return get_status(self.is_started, self.process)
 
 
-    # TODO: The implementation is not finished
     def collect_results(self):
         """
         Raises:
@@ -426,7 +425,6 @@ class RemoteProcess(IObjectRunner):
             self.process
         )
 
-        # TODO: Check this remotely via SSH
         # If an object has filepath defined, it means there should be 
         # an output file produced. However it does not mean that the file
         # was created successfully, that's why we check whether the filepath exists.
@@ -445,32 +443,24 @@ class RemoteProcess(IObjectRunner):
         create_local_directory(destination_dir)
 
         logger.info(f'Copying object results into: {destination_dir}')
-
         filename = self.obj.filepath.name
         source = self.obj.filepath
         destination = destination_dir / filename
-        print(destination)
 
-        with fabric.Connection(host=self.host, user=self.username) as c:
-            # the folder tmp_5 should be there
-            # result = c.get(self.obj.filepath, '/Users/msharabayko/projects/srt/lib-srt-utils/tmp_5/uhu.pcapng')
-            # result = c.get(self.obj.filepath, 'tmp_5/olala.pcapng')
-
-            # result = c.get(self.obj.filepath, f'{dirpath}/olala.pcapng')
-
-            result = c.get(source, destination)
-            print(result)
-
-            # TODO: Implement
-            # http://docs.fabfile.org/en/1.14/api/core/operations.html
+        # TODO: Implement copying files using rsync
+        try:
             # http://docs.fabfile.org/en/2.3/api/transfer.html
-            
-            # if result.exited != 0:
-            #     logger.debug(f'Directory has not been created: {dirpath}')
-            #     raise DirectoryHasNotBeenCreated(f'Username: {username}, host: {host}, dirpath: {dirpath}')
-
-        # TODO: Implement
-        # exit code, stdout, stderr, files
-        # download files via scp for SSHSubprocess
-
-        # logger.info('Collected successfully')
+            with fabric.Connection(host=self.host, user=self.username) as c:
+                result = c.get(source, destination)
+                print(result)
+        except OSError as error:
+            raise SrtUtilsException(
+                f'Object results have not been collected: {self.obj.filepath}'
+                f'. Exception occured ({error.__class__.__name__}): {error}. '
+            )
+        except Exception as error:
+            logger.info('Most probably paramiko exception')
+            raise SrtUtilsException(
+                f'Object results have not been collected: {self.obj.filepath}'
+                f'. Exception occured ({error.__class__.__name__}): {error}. '
+            )
