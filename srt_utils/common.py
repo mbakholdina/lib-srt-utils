@@ -1,4 +1,4 @@
-""" TODO """
+""" Common variables and functions. """
 
 import pathlib
 
@@ -6,6 +6,13 @@ from srt_utils.exceptions import SrtUtilsException
 
 
 def create_local_directory(dirpath: pathlib.Path):
+    """
+    Helper function used to create the directory locally.
+
+    Attributes:
+        dirpath:
+            `pathlib.Path` directory path.
+    """
     if dirpath.exists():
         return False
 
