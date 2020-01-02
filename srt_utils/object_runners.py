@@ -38,8 +38,8 @@ def before_collect_results_checks(
     collect_results_path: pathlib.Path
 ):
     """
-    Helper function which performs prelimenary checks for `LocalProcess` and
-    `RemoteProcess` classes before collecting object results.
+    Helper function which performs prelimenary checks for `LocalRunner` and
+    `RemoteRunner` classes before collecting object results.
     """
     if not process.is_started:
         raise SrtUtilsException(
@@ -149,7 +149,7 @@ class IObjectRunner(ABC):
         pass
 
 
-class LocalProcess(IObjectRunner):
+class LocalRunner(IObjectRunner):
 
     def __init__(
         self,
@@ -189,7 +189,7 @@ class LocalProcess(IObjectRunner):
                 `pathlib.Path` directory path.
         """
         logger.info(
-            '[LocalProcess] Creating a local directory for saving '
+            '[LocalRunner] Creating a local directory for saving '
             f'object results: {dirpath}'
         )
 
@@ -197,7 +197,7 @@ class LocalProcess(IObjectRunner):
 
         if not created:
             logger.info(
-                '[LocalProcess] Directory already exists, no need to '
+                '[LocalRunner] Directory already exists, no need to '
                 f'create: {dirpath}'
             )
 
@@ -274,7 +274,7 @@ class LocalProcess(IObjectRunner):
         # after the copy is done. Make sure no exception was raised though.
 
         # In case we have several tasks which is runned locally by 
-        # LocalProcess runner and in case the tasks have the same names 
+        # LocalRunner runner and in case the tasks have the same names 
         # for the output files, the result might be overwritten. 
         # That's why we do not delete destination file before, instead
         # we catch FileExistsError exception. That's why it is necessary 
@@ -298,7 +298,7 @@ class LocalProcess(IObjectRunner):
         # TODO: (?) Delete source file, might be an option, but not necessary at the start
 
 
-class RemoteProcess(IObjectRunner):
+class RemoteRunner(IObjectRunner):
 
     def __init__(
         self,
@@ -364,7 +364,7 @@ class RemoteProcess(IObjectRunner):
             SrtUtilsException
         """
         logger.info(
-            '[RemoteProcess] Creating a directory for saving object results '
+            '[RemoteRunner] Creating a directory for saving object results '
             f'remotely via SSH. Username: {username}, host: {host}, '
             f'dirpath: {dirpath}'
         )

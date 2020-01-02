@@ -33,10 +33,10 @@ class SimpleFactory:
     def create_runner(self, obj, runner_type: str, runner_config: dict) -> object_runners.IObjectRunner:
         runner = None
 
-        if runner_type == 'subprocess':
-            runner = object_runners.LocalProcess.from_config(obj, runner_config)
-        elif runner_type == 'ssh-subprocess':
-            runner = object_runners.RemoteProcess.from_config(obj, runner_config)
+        if runner_type == 'local-runner':
+            runner = object_runners.LocalRunner.from_config(obj, runner_config)
+        elif runner_type == 'remote-runner':
+            runner = object_runners.RemoteRunner.from_config(obj, runner_config)
         else:
             print('No matching runner found')
 

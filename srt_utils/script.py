@@ -4,6 +4,8 @@ import logging
 import pprint
 import time
 
+import click
+
 from srt_utils.exceptions import SrtUtilsException
 from srt_utils.runners import SingleExperimentRunner
 
@@ -53,43 +55,43 @@ def create_experiment_config(stop_after: int, collect_results_path: str, ignore_
     config['tasks']['0'] = create_task_config(
         'tshark', 
         tshark_config, 
-        'subprocess', 
+        'local-runner', 
         tshark_runner_config,
         sleep_after_start,
         sleep_after_stop
     )
 
-    tshark_config = {
-        'interface': 'en0',
-        'port': 4200,
-        'filepath': f'{dirpath}_local/dump2.pcapng',
-    }
-    tshark_runner_config = {}
-    config['tasks']['1'] = create_task_config(
-        'tshark', 
-        tshark_config, 
-        'subprocess', 
-        tshark_runner_config,
-        sleep_after_start
-    )
+    # tshark_config = {
+    #     'interface': 'en0',
+    #     'port': 4200,
+    #     'filepath': f'{dirpath}_local/dump2.pcapng',
+    # }
+    # tshark_runner_config = {}
+    # config['tasks']['1'] = create_task_config(
+    #     'tshark', 
+    #     tshark_config, 
+    #     'local-runner', 
+    #     tshark_runner_config,
+    #     sleep_after_start
+    # )
 
     tshark_config = {
         'interface': 'eth0',
         'port': 4200,
-        'filepath': f'{dirpath}_remote/dump.pcapng',
+        'filepath': f'{dirpath}_remote/dump2.pcapng',
     }
     tshark_runner_config = {
         'username': 'msharabayko',
         'host': '137.116.228.51',
     }
-    # config['tasks']['1'] = create_task_config(
-    #     'tshark', 
-    #     tshark_config, 
-    #     'ssh-subprocess', 
-    #     tshark_runner_config,
-    #     None,
-    #     sleep_after_stop
-    # )
+    config['tasks']['1'] = create_task_config(
+        'tshark', 
+        tshark_config, 
+        'remote-runner', 
+        tshark_runner_config,
+        None,
+        sleep_after_stop
+    )
 
     srt_test_msg_config = {
         'path': '/Users/msharabayko/projects/srt/srt-maxlovic/_build',
@@ -111,7 +113,7 @@ def create_experiment_config(stop_after: int, collect_results_path: str, ignore_
         'dirpath': '_results',
     } 
     srt_test_msg_runner_config = None
-    # config['task3']= create_task_config('srt-test-messaging', srt_test_msg_config, 'subprocess', srt_test_msg_runner_config)
+    # config['task3']= create_task_config('srt-test-messaging', srt_test_msg_config, 'local-runner', srt_test_msg_runner_config)
 
     srt_test_msg_config = {
         'path': 'projects/srt-maxlovic/_build',
@@ -136,7 +138,7 @@ def create_experiment_config(stop_after: int, collect_results_path: str, ignore_
         'username': 'msharabayko',
         'host': '65.52.227.197',
     }
-    # config['task4']= create_task_config('srt-test-messaging', srt_test_msg_config, 'ssh-subprocess', srt_test_msg_runner_config)
+    # config['task4']= create_task_config('srt-test-messaging', srt_test_msg_config, 'remote-runner', srt_test_msg_runner_config)
 
     pp = pprint.PrettyPrinter(indent=2)
     pp.pprint(config)
@@ -144,8 +146,11 @@ def create_experiment_config(stop_after: int, collect_results_path: str, ignore_
     return config
 
 
-if __name__ == '__main__':
-
+@click.command()
+@click.argument(
+	'dirpath'
+)
+def main(dirpath):
     logging.basicConfig(
         level=logging.INFO,
         # format='%(asctime)s %(name)-12s %(levelname)-8s %(message)s',
@@ -153,15 +158,13 @@ if __name__ == '__main__':
     )
 
     # time to stream
-    stop_after = 20
-    # TODO: Make an option
-    collect_results_path = '_results_exp'
+    stop_after = 10
     # This will be changed to loading the config from file
     # and then adjusting it (srt parameters, etc.) knowing what kind of
     # experiment we are going to do. Or we will provide a cli to user with
     # the list of parameters we need to know (or it would be just a file with the list of params),
     # and then config file for the experiment will be built in a function and parameters will be adjusted
-    config = create_experiment_config(stop_after, collect_results_path)
+    config = create_experiment_config(stop_after, dirpath)
 
     try:
         exp_runner = SingleExperimentRunner.from_config(config)
@@ -174,3 +177,7 @@ if __name__ == '__main__':
         logger.error(f'Failed to run experiment. Reason: {error}', exc_info=True)
     finally:
         exp_runner.clean_up()
+
+
+if __name__ == '__main__':
+    main()
