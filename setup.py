@@ -7,6 +7,7 @@ install_requires = [
     'click >=7.0,<8.0',
     'fabric',
     'paramiko',
+    'patchwork'
 ]
 
 
