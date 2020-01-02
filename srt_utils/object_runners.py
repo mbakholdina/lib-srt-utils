@@ -9,7 +9,7 @@ from patchwork.files import exists
 from srt_utils.common import create_local_directory
 from srt_utils.enums import Status
 from srt_utils.exceptions import SrtUtilsException
-import srt_utils.objects as objects
+from srt_utils.objects import IObject
 from srt_utils.process import Process
 
 
@@ -33,10 +33,14 @@ SSH_COMMON_ARGS = [
 
 
 def before_collect_results_checks(
-    obj: objects.IObject,
+    obj: IObject,
     process: Process,
     collect_results_path: pathlib.Path
 ):
+    """
+    Helper function which performs prelimenary checks for `LocalProcess` and
+    `RemoteProcess` classes before collecting object results.
+    """
     if not process.is_started:
         raise SrtUtilsException(
             f'Process has not been started yet: {obj}. '
@@ -66,28 +70,82 @@ def before_collect_results_checks(
 
 
 class IObjectRunner(ABC):
+    """
+    Object Runner interface.
+
+    Object here represents 1) a single application, e.g., tshark or any test
+    application like srt-live-transmit, srt-xtransmit, etc.; or 2) a hublet,
+    or 3) whatever we might need to run in future setups.
+    
+    Runner represents a way of running an object, e.g., locally or on a remote
+    machine via SSH using Python library `subprocess`, etc.
+    """
+
     @property
     @abstractmethod
-    def status(self):
+    def status(self) -> Status:
+        """
+        Object runner status.
+
+        Returns:
+            `Status.idle`:
+                If object runner has not been started yet,
+                Or if object runner has been started successfully, but the 
+                object is not running at the moment of getting status.
+            `Status.running`:
+                If object runner has been started successfully and the object 
+                is still running at the moment of getting status.
+        """
         pass
+
 
     @classmethod
     @abstractmethod
-    def from_config(cls, obj: objects.IObject, config: dict):
-        # obj - object (app, hublet) to run
-        # config - runner config
+    def from_config(cls, obj: IObject, config: dict):
+        """
+        Create `IObjectRunner` instance from config.
+
+        Attributes:
+            obj:
+                `IObject` object to run.
+            config:
+                Runner config.
+
+        Config examples are provided in interface implementation.
+        """
         pass
+
 
     @abstractmethod
     def start(self):
+        """
+        Start object.
+
+        Raises:
+            SrtUtilsException
+        """
         pass
+
 
     @abstractmethod
     def stop(self):
+        """
+        Stop object.
+
+        Raises:
+            SrtUtilsException
+        """
         pass
+
 
     @abstractmethod
     def collect_results(self):
+        """
+        Collect object results.
+
+        Raises:
+            SrtUtilsException
+        """
         pass
 
 
@@ -95,18 +153,19 @@ class LocalProcess(IObjectRunner):
 
     def __init__(
         self,
-        obj: objects.IObject,
+        obj: IObject,
         collect_results_path: pathlib.Path=pathlib.Path('.')
     ):
         """
-        TODO
-        
+        Runner used to run the object locally using Python
+        `subprocess` library.
+
         Attributes:
             obj:
-                `objects.IObject` object to run.
+                `IObject` object to run.
             collect_results_path:
                 `pathlib.Path` directory path where the results produced by 
-                the object should be copied.
+                the object should be copied once the object finishes its work.
         """
         self.obj = obj
         self.collect_results_path = collect_results_path
@@ -121,6 +180,14 @@ class LocalProcess(IObjectRunner):
 
     @staticmethod
     def _create_directory(dirpath: pathlib.Path):
+        """
+        Create local directory for saving object results before 
+        starting the object.
+
+        Attributes:
+            dirpath:
+                `pathlib.Path` directory path.
+        """
         logger.info(
             '[LocalProcess] Creating a local directory for saving '
             f'object results: {dirpath}'
@@ -136,7 +203,7 @@ class LocalProcess(IObjectRunner):
 
 
     @classmethod
-    def from_config(cls, obj: objects.IObject, config: dict={}):
+    def from_config(cls, obj: IObject, config: dict={}):
         """
         Config Example:
             config = {
@@ -150,12 +217,7 @@ class LocalProcess(IObjectRunner):
 
 
     def start(self):
-        """ 
-        Raises:
-            SrtUtilsException
-        """
         logger.info(f'Starting object on-premises: {self.obj}')
-
 
         if self.obj.dirpath != None:
             self._create_directory(self.obj.dirpath)
@@ -164,18 +226,15 @@ class LocalProcess(IObjectRunner):
 
 
     def stop(self):
-        """ 
-        Raises:
-            SrtUtilsException
-        """
         logger.info(f'Stopping object on-premises: {self.obj}, {self.process}')
         self.process.stop()
 
 
     def collect_results(self):
         """
-        Raises:
-            SrtUtilsException
+        Before collecting object results, this function creates a local 
+        directory `local` inside self.collect_results_path directory
+        where the results produced by the object are copied.
         """
         logger.info(f'Collecting object results: {self.obj}, {self.process}')
 
@@ -240,15 +299,29 @@ class LocalProcess(IObjectRunner):
 
 
 class RemoteProcess(IObjectRunner):
-    """ TODO """
 
     def __init__(
         self,
-        obj: objects.IObject,
+        obj: IObject,
         username: str,
         host: str,
         collect_results_path: pathlib.Path=pathlib.Path('.')
     ):
+        """
+        Runner used to run the object remotely via SSH using Python
+        `subprocess` library.
+
+        Attributes:
+            obj:
+                `IObject` object to run.
+            username:
+                Username on the remote machine to connect througth.
+            host:
+                IP address of the remote machine to connect.
+            collect_results_path:
+                `pathlib.Path` directory path where the results produced by 
+                the object should be copied once the object finishes its work.
+        """
         self.obj = obj
         self.username = username
         self.host = host
@@ -276,10 +349,16 @@ class RemoteProcess(IObjectRunner):
         host: str
     ):
         """
-        Create directory on a remote machine via SSH.
+        Create directory on a remote machine via SSH for saving object 
+        results before starting the object.
 
         Attributes:
-            TODO
+            dirpath:
+                `pathlib.Path` directory path.
+            username:
+                Username on the remote machine to connect througth.
+            host:
+                IP address of the remote machine to connect.
 
         Raises:
             SrtUtilsException
@@ -317,7 +396,7 @@ class RemoteProcess(IObjectRunner):
 
 
     @classmethod
-    def from_config(cls, obj: objects.IObject, config: dict):
+    def from_config(cls, obj: IObject, config: dict):
         """
         Config Example:
             config = {
@@ -338,10 +417,6 @@ class RemoteProcess(IObjectRunner):
 
 
     def start(self):
-        """ 
-        Raises:
-            SrtUtilsException
-        """
         logger.info(f'Starting object remotely via SSH: {self.obj}')
 
         if self.obj.dirpath != None:
@@ -355,18 +430,15 @@ class RemoteProcess(IObjectRunner):
 
 
     def stop(self):
-        """ 
-        Raises:
-            SrtUtilsException
-        """
         logger.info(f'Stopping object remotely via SSH: {self.obj}, {self.process}')
         self.process.stop()
 
 
     def collect_results(self):
         """
-        Raises:
-            SrtUtilsException
+        Before collecting object results, this function creates a local 
+        directory `username@host` inside self.collect_results_path directory
+        where the results produced by the object are copied.
         """
         logger.info(f'Collecting object results: {self.obj}, {self.process}')
 
