@@ -41,7 +41,7 @@ SSH_SUBPROCESS_CONFIG = {
 
 OBJECTS_CLASSES = [
     ('tshark', TSHARK_CONFIG, objects.Tshark),
-    ('srt-test-messaging', SRT_TEST_MESSAGING_CONFIG, objects.SrtTestMessaging),
+    ('srt-test-messaging', SRT_TEST_MESSAGING_CONFIG, objects.SrtXtransmit),
 ]
 
 @pytest.mark.parametrize('obj_type, obj_config, class_name', OBJECTS_CLASSES)
@@ -52,8 +52,8 @@ def test_factory_creates_right_object(obj_type, obj_config, class_name):
 
 
 RUNNERS_CLASSES = [
-    ('subprocess', SUBPROCESS_CONFIG, object_runners.Subprocess),
-    ('ssh-subprocess', SSH_SUBPROCESS_CONFIG, object_runners.SSHSubprocess),
+    ('subprocess', SUBPROCESS_CONFIG, object_runners.LocalRunner),
+    ('ssh-subprocess', SSH_SUBPROCESS_CONFIG, object_runners.RemoteRunner),
 ]
 
 @pytest.mark.parametrize('runner_type, runner_config, class_name', RUNNERS_CLASSES)

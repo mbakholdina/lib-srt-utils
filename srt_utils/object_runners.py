@@ -248,6 +248,7 @@ class LocalRunner(IObjectRunner):
         # an output file produced. However it does not mean that the file
         # was created successfully, that's why we check whether the filepath exists.
         if not self.obj.filepath.exists():
+            print(self.process.status)
             stdout, stderr = self.process.collect_results()
             raise SrtUtilsException(
                 'There was no output file produced by the object: '
@@ -330,8 +331,9 @@ class RemoteRunner(IObjectRunner):
         args = []
         args += SSH_COMMON_ARGS
         args += [f'{self.username}@{self.host}']
-        obj_args = [f'"{arg}"'for arg in self.obj.make_args()]
+        obj_args = [f'"{arg}"' if ' ' in arg else f'{arg}' for arg in self.obj.make_args()]
         args += obj_args
+        print(args)
 
         self.process = Process(args, True)
 

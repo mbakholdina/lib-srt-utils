@@ -23,8 +23,8 @@ class SimpleFactory:
 
         if obj_type == 'tshark':
             obj = objects.Tshark.from_config(obj_config)
-        elif obj_type == 'srt-test-messaging':
-            obj = objects.SrtTestMessaging.from_config(obj_config)
+        elif obj_type == 'srt-xtransmit':
+            obj = objects.SrtXtransmit.from_config(obj_config)
         else:
             print('No matching object found')
 
