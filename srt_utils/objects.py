@@ -2,6 +2,7 @@ from abc import abstractmethod, ABC
 import enum
 import logging
 import pathlib
+import typing
 
 
 logger = logging.getLogger(__name__)
@@ -68,10 +69,6 @@ def get_relative_paths(uri: str):
     )
 
 
-class DirectoryHasNotBeenCreated(Exception):
-    pass
-
-
 ### IObject (application, hublet, etc.) ###
 # ? IObjectConfig
 
@@ -132,71 +129,66 @@ class Tshark(IObject):
             '-i', self.interface, 
             '-f', f'udp port {self.port}', 
             '-s', '1500', 
-            '-w', self.filepath
+            '-w', str(self.filepath)
         ]
 
 
-class SrtTestMessaging(IObject):
+class SrtXtransmit(IObject):
 
     def __init__(
         self,
-        type,
-        path,
-        host,
-        port,
-        attrs_values,
-        options_values,
-        collect_stats,
-        description,
-        dirpath
-    ):
-        """
-        Types:
-        number,
-        path_to_srt: str,
-        host: str,
+        type: str,
+        path: str,
         port: str,
+        host: str='',
         attrs_values: typing.Optional[typing.List[typing.Tuple[str, str]]]=None,
         options_values: typing.Optional[typing.List[typing.Tuple[str, str]]]=None,
-        description: str=None,
-        collect_stats: bool=False,
-        dirpath: pathlib.Path=None
+        statsdir: typing.Optional[str]=None,
+        statsfreq: typing.Optional[int]=None
+    ):
         """
-        self.name = 'srt-test-messaging'
+        TODO
+        """
+        super().__init__('srt-xtransmit')
         self.type = type
         self.path = path
-        self.host = host
         self.port = port
+        self.host = host
         self.attrs_values = attrs_values
         self.options_values = options_values
-        self.collect_stats = collect_stats
-        self.description = description
-        self.dirpath = dirpath
-        # TODO: Determine
-        self.filepath = None
+        self.statsfreq = statsfreq
+
+        if statsdir is not None:
+            self.dirpath = pathlib.Path(statsdir)
+            self.filepath = self.dirpath / f'{self.name}-stats-{self.type}.csv'
+
 
     @classmethod
     def from_config(cls, config: dict):
         """
         config = {
-            'path': '/Users/msharabayko/projects/srt/srt-maxlovic/_build',
-            'type': 'snd',
-            'host': '137.135.161.223',
-            'port': '4200',
-            'attrs_values': [
+            'type': 'snd',                                                      # type of the application as per SrtApplicationType
+            # mode (for future): list/caller/rend
+            'path': '/Users/msharabayko/projects/srt/srt-maxlovic/_build',      # dirpath to srt-xtransmit application
+            'host': '137.135.161.223',                                          # host, optional (identifier of listener/caller as pf npw, rendevous is not supported), '' if not setted
+            'port': '4200',                                                     # port
+            'attrs_values': [                                                   # SRT URI attributes, optional
                 ('rcvbuf', '12058624'),
                 ('congestion', 'live'),
                 ('maxcon', '50'),
             ],
-            'options_values': [
+            'options_values': [                                                 # application options, optional
                 ('-msgsize', '1456'),
                 ('-reply', '0'),
                 ('-printmsg', '0'),
             ],
-            'collect_stats': True,
-            'description': 'busy_waiting',
-            'dirpath': '_results',
+            # 'collect_stats': True,                                              # True/False depending on collect/do not collect statistics in .csv
+            # 'description': 'busy_waiting',
+            # 'dirpath': '_results',                                              # dirpath where to save object output, optional if collect_stats = False
+            statsdir:                                                              # optional, if set up, collect stats
+            statsfreq:                                                            # optional
         } 
+    
         attrs_values:
             A list of SRT options (SRT URI attributes) in a format
             [('rcvbuf', '12058624'), ('smoother', 'live'), ('maxcon', '50')].
@@ -207,44 +199,78 @@ class SrtTestMessaging(IObject):
         return cls(
             config['type'],
             config['path'],
-            config['host'],
             config['port'],
-            config['attrs_values'],
-            config['options_values'],
-            config['collect_stats'],
-            config['description'],
-            config['dirpath']
+            config.get('host', ''),
+            config.get('attrs_values'),
+            config.get('options_values'),
+            config.get('statsdir'),
+            config.get('statsfreq')
         )
 
     def make_args(self):
         # TODO: Add receiver support
         args = []
-        args += [f'{self.path}/{self.name}']
-
-        if self.attrs_values is not None:
-            # FIXME: But here there is a problem with "" because sender has been
-            # started locally, not via SSH
-            if self.type == SrtApplicationType.sender.value:
-                args += [f'srt://{self.host}:{self.port}?{get_query(self.attrs_values)}']
-            # FIXME: Deleted additonal quotes, needs to be tested with receiver running locally
-            if self.type == SrtApplicationType.receiver.value:
-                args += [f'srt://{self.host}:{self.port}?{get_query(self.attrs_values)}']
-        else:
-            args += [f'srt://{self.host}:{self.port}']
+        args += [f'{self.path}']
 
         if self.type == SrtApplicationType.sender.value:
-            args += ['']
+            args += ['generate']
+
+        if self.type == SrtApplicationType.receiver.value:
+            args += ['receive']
+
+        # if self.attrs_values is not None:
+        #     # FIXME: But here there is a problem with "" because sender has been
+        #     # started locally, not via SSH
+        #     if self.type == SrtApplicationType.sender.value:
+        #         args += [f'srt://{self.host}:{self.port}?{get_query(self.attrs_values)}']
+        #     # FIXME: Deleted additonal quotes, needs to be tested with receiver running locally
+        #     if self.type == SrtApplicationType.receiver.value:
+        #         args += [f'srt://{self.host}:{self.port}?{get_query(self.attrs_values)}']
+        # else:
+        #     args += [f'srt://{self.host}:{self.port}']
+
+        if self.attrs_values is not None:
+            # FIXME: There is a problem with "" here, if to run an app via SSH,
+            # it does not work without ""
+            args += [f'"srt://{self.host}:{self.port}?{get_query(self.attrs_values)}"']
+        else:
+            args += [f'srt://{self.host}:{self.port}']
 
         if self.options_values is not None:
             for option, value in self.options_values:
                 args += [option, value]
 
-        if self.collect_stats:
-            # stats_file = self.dirpath / f'{self.description}-stats-{self.type}.csv'
-            stats_file = self.dirpath + '/' + f'{self.description}-stats-{self.type}.csv'
-            args += [
-                '-statsfreq', '1',
-                '-statsfile', stats_file,
-            ]
+        # TODO: In future, delete this attribute and implement parsing of the options
+        # --statsfreq 100ms --statsfile "az-euw-usw-filecc-take-$TAKE-rcv.csv"
+        if self.dirpath:
+            args += ['--statsfile', str(self.filepath)]
+
+            if self.statsfreq:
+                args += ['--statsfreq', self.statsfreq]
+
+        print(args)
+
+        # args += [
+        # # f'{ssh_username}@{ssh_host}',
+        # f'{self.path}/srt-xtransmit',
+        # 'receive'
+        # ]
+
+        # if self.attrs_values is not None:
+        #     # FIXME: There is a problem with "" here, if to run an app via SSH,
+        #     # it does not work without ""
+        #     args += [f'"srt://{self.host}:{self.port}?{get_query(self.attrs_values)}"']
+        # else:
+        #     args += [f'srt://{self.host}:{self.port}']
+
+        # if self.options_values is not None:
+        #     for option, value in self.options_values:
+        #         args += [option, value]
+
+        # if self.collect_stats:
+        #     args += ['--statsfreq', '100']
+        #     args += ['--statsfile', self.filepath]
+        
+        # print(f'{args}')
         
         return args

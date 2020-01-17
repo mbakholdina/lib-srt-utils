@@ -44,22 +44,22 @@ def create_experiment_config(stop_after: int, collect_results_path: str, ignore_
     config['collect_results_path'] = collect_results_path     # path where to collect results
     config['stop_after'] = stop_after
     config['ignore_stop_order'] = ignore_stop_order
-
     config['tasks'] = {}
-    tshark_config = {
-        'interface': 'en0',
-        'port': 4200,
-        'filepath': f'{dirpath}_local/dump1.pcapng',
-    }
-    tshark_runner_config = {}
-    config['tasks']['0'] = create_task_config(
-        'tshark', 
-        tshark_config, 
-        'local-runner', 
-        tshark_runner_config,
-        sleep_after_start,
-        sleep_after_stop
-    )
+
+    # tshark_config = {
+    #     'interface': 'en0',
+    #     'port': 4200,
+    #     'filepath': f'{dirpath}_local/dump1.pcapng',
+    # }
+    # tshark_runner_config = {}
+    # config['tasks']['0'] = create_task_config(
+    #     'tshark', 
+    #     tshark_config, 
+    #     'local-runner', 
+    #     tshark_runner_config,
+    #     sleep_after_start,
+    #     sleep_after_stop
+    # )
 
     # tshark_config = {
     #     'interface': 'en0',
@@ -75,71 +75,75 @@ def create_experiment_config(stop_after: int, collect_results_path: str, ignore_
     #     sleep_after_start
     # )
 
+    REMOTE_RUNNER_CONFIG = {
+        'username': 'msharabayko',
+        'host': '137.116.228.51',
+    }
+
     tshark_config = {
         'interface': 'eth0',
         'port': 4200,
         'filepath': f'{dirpath}_remote/dump2.pcapng',
     }
-    tshark_runner_config = {
-        'username': 'msharabayko',
-        'host': '137.116.228.51',
-    }
     config['tasks']['1'] = create_task_config(
         'tshark', 
         tshark_config, 
         'remote-runner', 
-        tshark_runner_config,
+        REMOTE_RUNNER_CONFIG,
         None,
         sleep_after_stop
     )
 
-    srt_test_msg_config = {
-        'path': '/Users/msharabayko/projects/srt/srt-maxlovic/_build',
+    SRT_XTRANSMIT_RCV_CONFIG = {
         'type': 'rcv',
-        'host': '',
+        'path': 'projects/srt-xtransmit/_build/bin/srt-xtransmit',
         'port': '4200',
         'attrs_values': [
-            ('rcvbuf', '12058624'),
-            ('congestion', 'live'),
-            ('maxcon', '50'),
-        ],
+                ('transtype', 'live'),
+                ('rcvbuf', '1000000000'),
+                ('sndbuf', '1000000000'),
+            ],
         'options_values': [
-            ('-msgsize', '1456'),
-            ('-reply', '0'),
-            ('-printmsg', '0'),
+            ('--msgsize', '1316'),
         ],
-        'collect_stats': True,
-        'description': 'busy_waiting',
-        'dirpath': '_results',
-    } 
-    srt_test_msg_runner_config = None
-    # config['task3']= create_task_config('srt-test-messaging', srt_test_msg_config, 'local-runner', srt_test_msg_runner_config)
+        'statsdir': '_results',
+        'statsfreq': '100'
+    }
+    config['tasks']['3']= create_task_config(
+        'srt-xtransmit',
+        SRT_XTRANSMIT_RCV_CONFIG,
+        'remote-runner',
+        REMOTE_RUNNER_CONFIG
+    )
 
-    srt_test_msg_config = {
-        'path': 'projects/srt-maxlovic/_build',
-        'type': 'rcv',
-        'host': '',
+    SRT_XTRANSMIT_SND_CONFIG = {
+        'type': 'snd',
+        'path': '../srt-xtransmit/_build/bin/srt-xtransmit',
         'port': '4200',
+        'host': '137.116.228.51',
         'attrs_values': [
-            ('rcvbuf', '12058624'),
-            ('congestion', 'live'),
-            ('maxcon', '50'),
+            ('transtype', 'live'),
+            ('rcvbuf', '1000000000'),
+            ('sndbuf', '1000000000'),
         ],
         'options_values': [
-            ('-msgsize', '1456'),
-            ('-reply', '0'),
-            ('-printmsg', '0'),
+            ('--msgsize', '1316'),
+            ('--sendrate', '15Mbps'),
+            ('--duration', '10s'),
         ],
-        'collect_stats': True,
-        'description': 'busy_waiting',
-        'dirpath': '_results',
+        'statsdir': '_results',
+        'statsfreq': '100'
     }
-    srt_test_msg_runner_config = {
-        'username': 'msharabayko',
-        'host': '65.52.227.197',
-    }
-    # config['task4']= create_task_config('srt-test-messaging', srt_test_msg_config, 'remote-runner', srt_test_msg_runner_config)
+    LOCAL_RUNNER_CONFIG = {}
+    config['tasks']['4']= create_task_config(
+        'srt-xtransmit',
+        SRT_XTRANSMIT_SND_CONFIG,
+        'local-runner',
+        LOCAL_RUNNER_CONFIG
+    )
 
+    # TODO: sort_dicts option - added in Python 3.8
+    # pp = pprint.PrettyPrinter(indent=2, sort_dicts=False)
     pp = pprint.PrettyPrinter(indent=2)
     pp.pprint(config)
 
@@ -158,7 +162,7 @@ def main(dirpath):
     )
 
     # time to stream
-    stop_after = 10
+    stop_after = 20
     # This will be changed to loading the config from file
     # and then adjusting it (srt parameters, etc.) knowing what kind of
     # experiment we are going to do. Or we will provide a cli to user with

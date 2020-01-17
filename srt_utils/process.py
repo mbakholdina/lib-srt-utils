@@ -61,9 +61,11 @@ class Process:
                 running at the moment of getting status.
         """
         if self.process == None:
+            print("process=None")
             return (Status.idle, None)
 
         if not self.is_started:
+            print('not is_started')
             return (Status.idle, None)
 
         returncode = self.process.poll()
@@ -109,7 +111,7 @@ class Process:
                 self.is_started = True
         except OSError as error:
             raise SrtUtilsException(
-                f'Process has not been started: {self.args}. Reason: {error}'
+                f'Process has not been started: {self.args}. {error}'
             )
     
         # TODO: Adjust timers
@@ -164,6 +166,7 @@ class Process:
         for i in range(3):
             time.sleep(1)
             status, _ = self.status
+            print(status)
             if status == Status.idle:
                 return
 
