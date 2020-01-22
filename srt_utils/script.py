@@ -50,9 +50,10 @@ def create_experiment_config(stop_after: int, collect_results_path: str, ignore_
 
     # Task 1 - Start tshark locally
     TSHARK_LO_CONFIG = {
+        'path': 'tshark',
         'interface': 'en0',
         'port': 4200,
-        'filepath': '_results/dump.pcapng',
+        'dirpath': '_results',
     }
     config['tasks']['1'] = create_task_config(
         'tshark', 
@@ -63,9 +64,10 @@ def create_experiment_config(stop_after: int, collect_results_path: str, ignore_
 
     # Task 2 - Start tshark on a remote machine
     TSHARK_RE_CONFIG = {
+        'path': 'tshark',
         'interface': 'eth0',
         'port': 4200,
-        'filepath': '_results/dump.pcapng',
+        'dirpath': '_results',
     }
     config['tasks']['2'] = create_task_config(
         'tshark', 
@@ -138,7 +140,7 @@ def create_experiment_config(stop_after: int, collect_results_path: str, ignore_
 
 @click.command()
 @click.argument(
-	'dirpath'
+    'dirpath'
 )
 def main(dirpath):
     logging.basicConfig(
@@ -148,7 +150,7 @@ def main(dirpath):
     )
 
     # time to stream
-    stop_after = 60
+    stop_after = 30
     # This will be changed to loading the config from file
     # and then adjusting it (srt parameters, etc.) knowing what kind of
     # experiment we are going to do. Or we will provide a cli to user with

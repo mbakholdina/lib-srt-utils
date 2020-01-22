@@ -31,45 +31,6 @@ def get_query(attrs_values: typing.List[typing.Tuple[str, str]]):
     return f'{"&".join(query_elements)}'
 
 
-def get_relative_paths(uri: str):
-    """
-    Depending on the ``uri`` type determine the corresponding relative
-    URI path and relative parent path containing URI ones.
-    Arguments:
-        uri:
-            An absolute URI path:
-            /results/file.txt
-            /file.txt
-            or a relative URI path:
-            ../results/file.txt
-            ./results/file.txt
-            results/file.txt
-            ./file.txt
-            file.txt
-            to a file.
-    Returns:
-        A tuple of :class:`pathlib.Path` relative URI path and
-        :class:`pathlib.Path` relative parent path containing URI ones.
-    """
-    # If URI starts with '/', i.e., it is absolute,
-    # e.g., /file.txt
-    if pathlib.Path(uri).is_absolute():
-        uri_path = pathlib.Path(uri)
-        parent_path = uri_path.parent
-        relative_uri_path = uri_path.relative_to('/')
-        relative_parent_path = parent_path.relative_to('/')
-    # If URI does not start with '/', i.e., it is relative,
-    # e.g., file.txt
-    else:
-        relative_uri_path = pathlib.Path(uri)
-        relative_parent_path = relative_uri_path.parent
-
-    return (
-        relative_uri_path,
-        relative_parent_path,
-    )
-
-
 class IObject(ABC):
     """
     Object interface.
@@ -132,7 +93,7 @@ class IObject(ABC):
 
 class Tshark(IObject):
 
-    def __init__(self, interface: str, port: str, filepath: str):
+    def __init__(self, path: str, interface: str, port: str, dirpath: str):
         """
         An object for `tshark` application.
 
@@ -140,18 +101,21 @@ class Tshark(IObject):
         tshark -i en0 -f "udp port 4200" -s 1500 -w _results/dump.pcapng
 
         Attributes:
+            path:
+                Path to tshark application.
             interface:
                 Interface to listen and capture the traffic.
             port:
                 Port to listen and capture the traffic.
-            filepath:
-                Filepath to store output .pcapng trace file.
+            dirpath:
+                Dirpath to store output .pcapng trace file.
         """
         super().__init__('tshark')
+        self.path = path
         self.interface = interface
         self.port = port
-        # filepath must be relative
-        self.filepath, self.dirpath = get_relative_paths(filepath)
+        self.dirpath = pathlib.Path(dirpath)
+        self.filepath = self.dirpath / f'{self.name}-trace-file.pcapng'
 
 
     @classmethod
@@ -159,15 +123,17 @@ class Tshark(IObject):
         """ 
         Config Example:
             config = {
+                'path': 'tshark',               # Path to tshark application
                 'interface': 'en0',             # Interface to listen and capture the traffic
                 'port': 4200,                   # Port to listen and capture the traffic
-                'filepath': './dump.pcapng',    # Filepath to store output .pcapng trace file
+                'dirpath': '_results',          # Dirpath to store output .pcapng trace file
             }
         """
         return cls(
+            config['path'],
             config['interface'],
             config['port'],
-            config['filepath']
+            config['dirpath']
         )
 
 
@@ -182,7 +148,7 @@ class Tshark(IObject):
         to run through `LocalRunner` based on Python `subprocess` module.
         """
         return [
-            'tshark', 
+            self.path, 
             '-i', self.interface, 
             '-f', f'udp port {self.port}', 
             '-s', '1500', 
