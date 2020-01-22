@@ -158,15 +158,15 @@ class Process:
             return
 
         status, _ = self.status
-        if status == Status.idle: 
+        if status == Status.idle:
             return
-        
+
+        logger.debug('Sending SIGINT/CTRL_C_EVENT signal')
         sig = signal.CTRL_C_EVENT if sys.platform == 'win32' else signal.SIGINT
         self.process.send_signal(sig)
         for i in range(3):
             time.sleep(1)
             status, _ = self.status
-            print(status)
             if status == Status.idle:
                 return
 

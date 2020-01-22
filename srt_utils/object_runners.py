@@ -1,3 +1,4 @@
+""" The module with IObjectRunner interface and its implementations. """
 import logging
 import pathlib
 from abc import abstractmethod, ABC
@@ -111,7 +112,7 @@ class IObjectRunner(ABC):
             config:
                 Runner config.
 
-        Config examples are provided in interface implementation.
+        Config examples are provided in interface implementations.
         """
         pass
 
@@ -169,7 +170,8 @@ class LocalRunner(IObjectRunner):
         """
         self.obj = obj
         self.collect_results_path = collect_results_path
-        self.process = Process(self.obj.make_args())
+        self.args = self.obj.make_args()
+        self.process = Process(self.args)
 
 
     @property
@@ -189,17 +191,16 @@ class LocalRunner(IObjectRunner):
                 `pathlib.Path` directory path.
         """
         logger.info(
-            '[LocalRunner] Creating a local directory for saving '
-            f'object results: {dirpath}'
+            '[LocalRunner] Creating a local directory for saving object '
+            f'results: {dirpath}'
         )
 
         created = create_local_directory(dirpath)
-
-        if not created:
-            logger.info(
-                '[LocalRunner] Directory already exists, no need to '
-                f'create: {dirpath}'
-            )
+        # if not created:
+        #     logger.info(
+        #         '[LocalRunner] Directory already exists, no need to '
+        #         f'create: {dirpath}'
+        #     )
 
 
     @classmethod
@@ -218,6 +219,7 @@ class LocalRunner(IObjectRunner):
 
     def start(self):
         logger.info(f'Starting object on-premises: {self.obj}')
+        logger.info(f'Arguments for LocalRunner: {self.obj.make_args()}')
 
         if self.obj.dirpath != None:
             self._create_directory(self.obj.dirpath)
@@ -248,7 +250,6 @@ class LocalRunner(IObjectRunner):
         # an output file produced. However it does not mean that the file
         # was created successfully, that's why we check whether the filepath exists.
         if not self.obj.filepath.exists():
-            print(self.process.status)
             stdout, stderr = self.process.collect_results()
             raise SrtUtilsException(
                 'There was no output file produced by the object: '
@@ -260,15 +261,15 @@ class LocalRunner(IObjectRunner):
         # (inside self.collect_results_path directory)
         destination_dir = self.collect_results_path / 'local'
         logger.info(
-            'Creating a local directory for copying object '
-            f'results: {destination_dir}'
+            'Creating a local directory for copying object results: '
+            f'{destination_dir}'
         )
         created = create_local_directory(destination_dir)
-        if not created:
-            logger.info(
-                'Directory already exists, no need to create: '
-                f'{destination_dir}'
-            )
+        # if not created:
+        #     logger.info(
+        #         'Directory already exists, no need to create: '
+        #         f'{destination_dir}'
+        #     )
 
         # The code below will raise a FileExistsError if destination already exists. 
         # Technically, this copies a file. To perform a move, simply delete source 
@@ -327,15 +328,13 @@ class RemoteRunner(IObjectRunner):
         self.username = username
         self.host = host
         self.collect_results_path = collect_results_path
+        
+        self.args = []
+        self.args += SSH_COMMON_ARGS
+        self.args += [f'{self.username}@{self.host}']
+        self.args += [self.obj.make_str()]
 
-        args = []
-        args += SSH_COMMON_ARGS
-        args += [f'{self.username}@{self.host}']
-        obj_args = [f'"{arg}"' if ' ' in arg else f'{arg}' for arg in self.obj.make_args()]
-        args += obj_args
-        print(args)
-
-        self.process = Process(args, True)
+        self.process = Process(self.args, True)
 
 
     @property
@@ -420,6 +419,7 @@ class RemoteRunner(IObjectRunner):
 
     def start(self):
         logger.info(f'Starting object remotely via SSH: {self.obj}')
+        logger.info(f'Arguments for RemoteRunner: {self.args}')
 
         if self.obj.dirpath != None:
             self._create_directory(
@@ -466,15 +466,15 @@ class RemoteRunner(IObjectRunner):
         # (inside self.collect_results_path directory)
         destination_dir = self.collect_results_path / f'{self.username}@{self.host}'
         logger.info(
-            'Creating a local directory for copying object '
-            f'results: {destination_dir}'
+            'Creating a local directory for copying object results: '
+            f'{destination_dir}'
         )
         created = create_local_directory(destination_dir)
-        if not created:
-            logger.info(
-                'Directory already exists, no need to create: '
-                f'{destination_dir}'
-            )
+        # if not created:
+        #     logger.info(
+        #         'Directory already exists, no need to create: '
+        #         f'{destination_dir}'
+        #     )
 
         logger.info(f'Copying object results into: {destination_dir}')
         filename = self.obj.filepath.name
