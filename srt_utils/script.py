@@ -36,63 +36,50 @@ def create_task_config(
 
 
 def create_experiment_config(stop_after: int, collect_results_path: str, ignore_stop_order: bool=True):
-    dirpath = '_results'
-    sleep_after_start = 3
-    sleep_after_stop = 1
-
-    config = {}
-    config['collect_results_path'] = collect_results_path     # path where to collect results
-    config['stop_after'] = stop_after
-    config['ignore_stop_order'] = ignore_stop_order
-    config['tasks'] = {}
-
-    # tshark_config = {
-    #     'interface': 'en0',
-    #     'port': 4200,
-    #     'filepath': f'{dirpath}_local/dump1.pcapng',
-    # }
-    # tshark_runner_config = {}
-    # config['tasks']['0'] = create_task_config(
-    #     'tshark', 
-    #     tshark_config, 
-    #     'local-runner', 
-    #     tshark_runner_config,
-    #     sleep_after_start,
-    #     sleep_after_stop
-    # )
-
-    # tshark_config = {
-    #     'interface': 'en0',
-    #     'port': 4200,
-    #     'filepath': f'{dirpath}_local/dump2.pcapng',
-    # }
-    # tshark_runner_config = {}
-    # config['tasks']['1'] = create_task_config(
-    #     'tshark', 
-    #     tshark_config, 
-    #     'local-runner', 
-    #     tshark_runner_config,
-    #     sleep_after_start
-    # )
-
+    LOCAL_RUNNER_CONFIG = {}
     REMOTE_RUNNER_CONFIG = {
         'username': 'msharabayko',
         'host': '137.116.228.51',
     }
 
-    tshark_config = {
-        'interface': 'eth0',
+    config = {}
+    config['collect_results_path'] = collect_results_path       # path to collect experiment results
+    config['stop_after'] = stop_after                           # time to wait since the last task have been started and then stop the experiment
+    config['ignore_stop_order'] = ignore_stop_order             # stop the tasks in a specified order if True, otherwise the reverse order is used
+    config['tasks'] = {}
+
+    # Task 1 - Start tshark locally
+    TSHARK_LO_CONFIG = {
+        'interface': 'en0',
         'port': 4200,
-        'filepath': f'{dirpath}_remote/dump2.pcapng',
+        'filepath': '_results/dump.pcapng',
     }
     config['tasks']['1'] = create_task_config(
         'tshark', 
-        tshark_config, 
-        'remote-runner', 
-        REMOTE_RUNNER_CONFIG,
-        None,
-        sleep_after_stop
+        TSHARK_LO_CONFIG, 
+        'local-runner', 
+        LOCAL_RUNNER_CONFIG
     )
+
+    # Task 2 - Start tshark on a remote machine
+    TSHARK_RE_CONFIG = {
+        'interface': 'eth0',
+        'port': 4200,
+        'filepath': '_results/dump.pcapng',
+    }
+    config['tasks']['2'] = create_task_config(
+        'tshark', 
+        TSHARK_RE_CONFIG, 
+        'remote-runner', 
+        REMOTE_RUNNER_CONFIG
+    )
+
+    # Task 3 - Start srt-xtransmit application (rcv) on a remote machine
+    # SRT_XTRANSMIT_RCV_SIMPLE_CONFIG = {
+    #     'type': 'rcv',
+    #     'path': 'projects/srt-xtransmit/_build/bin/srt-xtransmit',
+    #     'port': '4200',
+    # }
 
     SRT_XTRANSMIT_RCV_CONFIG = {
         'type': 'rcv',
@@ -116,6 +103,7 @@ def create_experiment_config(stop_after: int, collect_results_path: str, ignore_
         REMOTE_RUNNER_CONFIG
     )
 
+    # Task 4 - Start srt-xtransmit application (snd) locally
     SRT_XTRANSMIT_SND_CONFIG = {
         'type': 'snd',
         'path': '../srt-xtransmit/_build/bin/srt-xtransmit',
@@ -129,12 +117,10 @@ def create_experiment_config(stop_after: int, collect_results_path: str, ignore_
         'options_values': [
             ('--msgsize', '1316'),
             ('--sendrate', '15Mbps'),
-            ('--duration', '10s'),
         ],
         'statsdir': '_results',
         'statsfreq': '100'
     }
-    LOCAL_RUNNER_CONFIG = {}
     config['tasks']['4']= create_task_config(
         'srt-xtransmit',
         SRT_XTRANSMIT_SND_CONFIG,
@@ -162,12 +148,13 @@ def main(dirpath):
     )
 
     # time to stream
-    stop_after = 20
+    stop_after = 60
     # This will be changed to loading the config from file
     # and then adjusting it (srt parameters, etc.) knowing what kind of
     # experiment we are going to do. Or we will provide a cli to user with
     # the list of parameters we need to know (or it would be just a file with the list of params),
     # and then config file for the experiment will be built in a function and parameters will be adjusted
+    logger.info('Creating experiment config')
     config = create_experiment_config(stop_after, dirpath)
 
     try:
