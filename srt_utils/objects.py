@@ -98,7 +98,7 @@ class Tshark(IObject):
         An object for `tshark` application.
 
         Command example:
-        tshark -i en0 -f "udp port 4200" -s 1500 -w _results/dump.pcapng
+        tshark -i en0 -f "udp port 4200" -s 1500 -w _results/tshark-trace-file.pcapng
 
         Attributes:
             path:
@@ -140,10 +140,10 @@ class Tshark(IObject):
     def make_args(self):
         """
         Command
-        tshark -i en0 -f "udp port 4200" -s 1500 -w _results/dump.pcapng
+        tshark -i en0 -f "udp port 4200" -s 1500 -w _results/tshark-trace-file.pcapng
 
         transforms to the following list of arguments 
-        ['tshark', '-i', 'en0', '-f', 'udp port 4200', '-s', '1500', '-w', '_results/dump.pcapng']
+        ['tshark', '-i', 'en0', '-f', 'udp port 4200', '-s', '1500', '-w', '_results/tshark-trace-file.pcapng']
 
         to run through `LocalRunner` based on Python `subprocess` module.
         """
@@ -160,16 +160,16 @@ class Tshark(IObject):
         """
         Command
         ssh -t -o BatchMode=yes -o ConnectTimeout=10 msharabayko@137.116.228.51
-        'tshark -i eth0 -f "udp port 4200" -s 1500 -w _results/dump.pcapng'
+        'tshark -i en0 -f "udp port 4200" -s 1500 -w _results/tshark-trace-file.pcapng'
 
         transforms to the following list of arguments
         ['ssh', '-t', '-o', 'BatchMode=yes', '-o', 'ConnectTimeout=10', 'msharabayko@137.116.228.51',
-        'tshark -i eth0 -f "udp port 4200" -s 1500 -w _results/dump.pcapng']
+        'tshark -i en0 -f "udp port 4200" -s 1500 -w _results/tshark-trace-file.pcapng']
 
         when running through `RemoteRunner` based on Python `subprocess` module.
 
         Here we construct and return only the command string
-        'tshark -i eth0 -f "udp port 4200" -s 1500 -w _results/dump.pcapng'
+        'tshark -i en0 -f "udp port 4200" -s 1500 -w _results/tshark-trace-file.pcapng'
 
         SSH related arguments are added on top of that in `RemoteRunner` class.
         """
