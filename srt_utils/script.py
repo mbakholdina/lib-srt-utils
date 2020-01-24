@@ -39,7 +39,7 @@ def create_experiment_config(stop_after: int, collect_results_path: str, ignore_
     LOCAL_RUNNER_CONFIG = {}
     REMOTE_RUNNER_CONFIG = {
         'username': 'msharabayko',
-        'host': '137.116.228.51',
+        'host': '40.69.89.21',
     }
 
     config = {}
@@ -85,7 +85,7 @@ def create_experiment_config(stop_after: int, collect_results_path: str, ignore_
 
     SRT_XTRANSMIT_RCV_CONFIG = {
         'type': 'rcv',
-        'path': 'projects/srt-xtransmit/_build/bin/srt-xtransmit',
+        'path': '/home/msharabayko/projects/srt/srt-xtransmit/_build/bin/srt-xtransmit',
         'port': '4200',
         'attrs_values': [
                 ('transtype', 'live'),
@@ -110,7 +110,7 @@ def create_experiment_config(stop_after: int, collect_results_path: str, ignore_
         'type': 'snd',
         'path': '../srt-xtransmit/_build/bin/srt-xtransmit',
         'port': '4200',
-        'host': '137.116.228.51',
+        'host': '40.69.89.21',
         'attrs_values': [
             ('transtype', 'live'),
             ('rcvbuf', '1000000000'),
