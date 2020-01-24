@@ -18,8 +18,13 @@ logger = logging.getLogger(__name__)
 
 
 SSH_CONNECTION_TIMEOUT = 10
-# NOTE: It is important to add "-t" option in order for SSH 
-# to transfer SIGINT, SIGTERM signals to the command
+# NOTE: It is important to add "-tt" option in order for subprocess to be
+# able to pass SIGINT, SIGTERM signals to the command running remotely.
+# Before "-t" option was used, experiments showed that "-t" option does not
+# necessarily guarantee the allocation of pseudo-terminal which leads to
+# SIGINT not being passed to the command launched on the remote machine.
+# Replacing "-t" to "-tt" option which forces pseudo-tty allocation even 
+# if SSH has no local tty solves the problem
 # NOTE: It is important to add "-o BatchMode=yes" option 
 # in order to disable any kind of promt
 # NOTE: It is important to add # "-o ConnectTimeout={SSH_CONNECTION_TIMEOUT}"
@@ -27,7 +32,7 @@ SSH_CONNECTION_TIMEOUT = 10
 # quickly that the process has not been started successfully
 SSH_COMMON_ARGS = [
     'ssh', 
-    '-t',
+    '-tt',
     '-o', 'BatchMode=yes',
     '-o', f'ConnectTimeout={SSH_CONNECTION_TIMEOUT}',
 ]
