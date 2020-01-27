@@ -61,11 +61,9 @@ class Process:
                 running at the moment of getting status.
         """
         if self.process == None:
-            print("process=None")
             return (Status.idle, None)
 
         if not self.is_started:
-            print('not is_started')
             return (Status.idle, None)
 
         returncode = self.process.poll()
