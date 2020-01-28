@@ -1,5 +1,8 @@
-""" For debugging purposes. Will be deleted later. """
-
+"""
+Script designed for debugging pusposes: building configs, running
+single experiments.
+"""
+import json
 import logging
 import pprint
 import time
@@ -12,8 +15,6 @@ from srt_utils.runners import SingleExperimentRunner
 
 logger = logging.getLogger(__name__)
 
-
-### Configs ###
 
 def create_task_config(
     obj_type, 
@@ -35,54 +36,54 @@ def create_task_config(
     }
 
 
-def create_experiment_config(stop_after: int, collect_results_path: str, ignore_stop_order: bool=True):
-    LOCAL_RUNNER_CONFIG = {}
-    REMOTE_RUNNER_CONFIG = {
+def create_experiment_config(resultsdir: str):
+    logger.info('Creating experiment config')
+
+    LORUNNER_CONFIG = {}
+    RERUNNER_USEAST_CONFIG = {
+        'username': 'msharabayko',
+        'host': '23.96.93.54',
+    }
+    RERUNNER_EUNORTH_CONFIG = {
         'username': 'msharabayko',
         'host': '40.69.89.21',
     }
 
     config = {}
-    config['collect_results_path'] = collect_results_path       # path to collect experiment results
-    config['stop_after'] = stop_after                           # time to wait since the last task have been started and then stop the experiment
-    config['ignore_stop_order'] = ignore_stop_order             # stop the tasks in a specified order if True, otherwise the reverse order is used
+    config['collect_results_path'] = resultsdir    # path to collect experiment results
+    config['stop_after'] = 40                      # time to wait since the last task have been started and then stop the experiment
+    config['ignore_stop_order'] = True             # stop the tasks in a specified order if True, otherwise the reverse order is used
     config['tasks'] = {}
 
-    # Task 1 - Start tshark locally
-    TSHARK_LO_CONFIG = {
+    # Task 1 - Start tshark on a sender side
+    TSHARK_SND_CONFIG = {
         'path': 'tshark',
-        'interface': 'en0',
-        'port': 4200,
+        'interface': 'eth0',
+        'port': '4200',
         'dirpath': '_results',
     }
     config['tasks']['1'] = create_task_config(
         'tshark', 
-        TSHARK_LO_CONFIG, 
-        'local-runner', 
-        LOCAL_RUNNER_CONFIG
+        TSHARK_SND_CONFIG, 
+        'remote-runner', 
+        RERUNNER_USEAST_CONFIG
     )
 
-    # Task 2 - Start tshark on a remote machine
-    TSHARK_RE_CONFIG = {
+    # Task 2 - Start tshark on a receiver side
+    TSHARK_RCV_CONFIG = {
         'path': 'tshark',
         'interface': 'eth0',
-        'port': 4200,
+        'port': '4200',
         'dirpath': '_results',
     }
     config['tasks']['2'] = create_task_config(
         'tshark', 
-        TSHARK_RE_CONFIG, 
+        TSHARK_RCV_CONFIG, 
         'remote-runner', 
-        REMOTE_RUNNER_CONFIG
+        RERUNNER_EUNORTH_CONFIG
     )
 
-    # Task 3 - Start srt-xtransmit application (rcv) on a remote machine
-    # SRT_XTRANSMIT_RCV_SIMPLE_CONFIG = {
-    #     'type': 'rcv',
-    #     'path': 'projects/srt-xtransmit/_build/bin/srt-xtransmit',
-    #     'port': '4200',
-    # }
-
+    # Task 3 - Start srt-xtransmit application (rcv)
     SRT_XTRANSMIT_RCV_CONFIG = {
         'type': 'rcv',
         'path': '/home/msharabayko/projects/srt/srt-xtransmit/_build/bin/srt-xtransmit',
@@ -102,13 +103,13 @@ def create_experiment_config(stop_after: int, collect_results_path: str, ignore_
         'srt-xtransmit',
         SRT_XTRANSMIT_RCV_CONFIG,
         'remote-runner',
-        REMOTE_RUNNER_CONFIG
+        RERUNNER_EUNORTH_CONFIG
     )
 
-    # Task 4 - Start srt-xtransmit application (snd) locally
+    # Task 4 - Start srt-xtransmit application (snd)
     SRT_XTRANSMIT_SND_CONFIG = {
         'type': 'snd',
-        'path': '../srt-xtransmit/_build/bin/srt-xtransmit',
+        'path': '/home/msharabayko/projects/srt/srt-xtransmit/_build/bin/srt-xtransmit',
         'port': '4200',
         'host': '40.69.89.21',
         'attrs_values': [
@@ -119,6 +120,7 @@ def create_experiment_config(stop_after: int, collect_results_path: str, ignore_
         'options_values': [
             ('--msgsize', '1316'),
             ('--sendrate', '15Mbps'),
+            ('--duration', '30'),
         ],
         'statsdir': '_results',
         'statsfreq': '100'
@@ -126,8 +128,8 @@ def create_experiment_config(stop_after: int, collect_results_path: str, ignore_
     config['tasks']['4']= create_task_config(
         'srt-xtransmit',
         SRT_XTRANSMIT_SND_CONFIG,
-        'local-runner',
-        LOCAL_RUNNER_CONFIG
+        'remote-runner',
+        RERUNNER_USEAST_CONFIG
     )
 
     # TODO: sort_dicts option - added in Python 3.8
@@ -135,35 +137,32 @@ def create_experiment_config(stop_after: int, collect_results_path: str, ignore_
     pp = pprint.PrettyPrinter(indent=2)
     pp.pprint(config)
 
+    # TODO: Make config path option
+    with open("config.json", "w") as write_file:
+        json.dump(config, write_file, indent=4)
+
     return config
 
 
 @click.command()
-@click.argument(
-    'dirpath'
+@click.option(
+    '--resultsdir',
+    required=True,
+    help =  'Directory path to store experiment results.'
 )
-def main(dirpath):
+def main(resultsdir):
     logging.basicConfig(
         level=logging.INFO,
-        # format='%(asctime)s %(name)-12s %(levelname)-8s %(message)s',
         format='%(asctime)-15s [%(levelname)s] %(message)s',
     )
 
-    # time to stream
-    stop_after = 30
-    # This will be changed to loading the config from file
-    # and then adjusting it (srt parameters, etc.) knowing what kind of
-    # experiment we are going to do. Or we will provide a cli to user with
-    # the list of parameters we need to know (or it would be just a file with the list of params),
-    # and then config file for the experiment will be built in a function and parameters will be adjusted
-    logger.info('Creating experiment config')
-    config = create_experiment_config(stop_after, dirpath)
+    config = create_experiment_config(resultsdir)
 
     try:
         exp_runner = SingleExperimentRunner.from_config(config)
         exp_runner.start()
-        logger.info(f'Sleeping {stop_after}s after experiment start')
-        time.sleep(stop_after)
+        logger.info(f"Sleeping {config['stop_after']}s after experiment start")
+        time.sleep(config['stop_after'])
         exp_runner.stop()
         exp_runner.collect_results()
     except SrtUtilsException as error:
