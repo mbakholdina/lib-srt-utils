@@ -1,4 +1,7 @@
-""" TODO """
+"""
+Script designed to run single experiments from config.
+Configs can be found in `../configs` folder.
+"""
 import json
 import logging
 import time
@@ -21,13 +24,7 @@ logger = logging.getLogger(__name__)
     '--resultsdir',
     help =  'Directory path to store experiment results.'
 )
-@click.option(
-    '--stop-after',
-    type=int,
-    help=   'Time to wait since the last task has been started and then '
-            'stop the experiment.'
-)
-def main(config_path, resultsdir, stop_after):
+def main(config_path, resultsdir):
     logging.basicConfig(
         level=logging.INFO,
         format='%(asctime)-15s [%(levelname)s] %(message)s',
@@ -37,9 +34,6 @@ def main(config_path, resultsdir, stop_after):
 
     with open(config_path, "r") as read_file:
         config = json.load(read_file)
-
-    if stop_after is not None:
-        config['stop_after'] = stop_after
 
     if resultsdir is not None:
         config['collect_results_path'] = resultsdir
