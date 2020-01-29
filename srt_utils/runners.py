@@ -108,7 +108,7 @@ class SingleExperimentRunner:
         collect_results_path: pathlib.Path,
         ignore_stop_order: bool,
         stop_after: int,
-        tasks
+        tasks: dict
     ):
         """
         Class to run a single experiment.
@@ -236,11 +236,12 @@ class SingleExperimentRunner:
             logger.info('Experiment has been stopped already. Nothing to do')
             return
 
-        # TODO: Implement stopping tasks according to the specified stop order.
-        # By default, stop the tasks in reverse order
-        # if self.ignore_stop_order:
+        logger.info(f'Stopping tasks in reversed order')
 
-        for task in self.tasks:
+        # By default, stop the tasks in reverse order
+        # TODO: Implement stopping tasks according to the specified stop order.
+        # if self.ignore_stop_order:
+        for task in reversed(self.tasks):
             logging.info(f'Stopping task: {task}')
 
             # This try/except block is needed here in order to stop as much
