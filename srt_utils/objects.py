@@ -125,7 +125,7 @@ class Tshark(IObject):
             config = {
                 'path': 'tshark',               # Path to tshark application
                 'interface': 'en0',             # Interface to listen and capture the traffic
-                'port': 4200,                   # Port to listen and capture the traffic
+                'port': '4200',                   # Port to listen and capture the traffic
                 'dirpath': '_results',          # Dirpath to store output .pcapng trace file
             }
         """
@@ -189,7 +189,7 @@ class SrtXtransmit(IObject):
         attrs_values: typing.Optional[typing.List[typing.Tuple[str, str]]]=None,
         options_values: typing.Optional[typing.List[typing.Tuple[str, str]]]=None,
         statsdir: typing.Optional[str]=None,
-        statsfreq: typing.Optional[int]=None
+        statsfreq: typing.Optional[str]=None
     ):
         """
         An object for `srt-xtransmit` test application.

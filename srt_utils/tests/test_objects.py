@@ -90,7 +90,7 @@ ARGSSTR_5 = '../srt-xtransmit/_build/bin/srt-xtransmit generate ' \
 CONFIG_6 = {
     'path': 'tshark',
     'interface': 'en0',
-    'port': 4200,
+    'port': '4200',
     'dirpath': '_results',
 }
 ARGS_6 = ['tshark', '-i', 'en0', '-f', 'udp port 4200', '-s', '1500', '-w', '_results/tshark-trace-file.pcapng']

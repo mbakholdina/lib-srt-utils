@@ -8,7 +8,7 @@
             "obj_config": {
                 "path": "tshark",
                 "interface": "en0",
-                "port": 4200,
+                "port": "4200",
                 "dirpath": "_results"
             },
             "runner_type": "local-runner",
@@ -22,7 +22,7 @@
             "obj_config": {
                 "path": "tshark",
                 "interface": "eth0",
-                "port": 4200,
+                "port": "4200",
                 "dirpath": "_results"
             },
             "runner_type": "remote-runner",
