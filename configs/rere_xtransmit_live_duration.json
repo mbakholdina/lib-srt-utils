@@ -1,0 +1,126 @@
+{
+    "collect_results_path": "_experiment_results",
+    "stop_after": 40,
+    "ignore_stop_order": true,
+    "tasks": {
+        "1": {
+            "obj_type": "tshark",
+            "obj_config": {
+                "path": "tshark",
+                "interface": "eth0",
+                "port": "4200",
+                "dirpath": "_results"
+            },
+            "runner_type": "remote-runner",
+            "runner_config": {
+                "username": "msharabayko",
+                "host": "23.96.93.54"
+            },
+            "sleep_after_start": null,
+            "sleep_after_stop": null,
+            "stop_order": null
+        },
+        "2": {
+            "obj_type": "tshark",
+            "obj_config": {
+                "path": "tshark",
+                "interface": "eth0",
+                "port": "4200",
+                "dirpath": "_results"
+            },
+            "runner_type": "remote-runner",
+            "runner_config": {
+                "username": "msharabayko",
+                "host": "40.69.89.21"
+            },
+            "sleep_after_start": null,
+            "sleep_after_stop": null,
+            "stop_order": null
+        },
+        "3": {
+            "obj_type": "srt-xtransmit",
+            "obj_config": {
+                "type": "rcv",
+                "path": "/home/msharabayko/projects/srt/srt-xtransmit/_build/bin/srt-xtransmit",
+                "port": "4200",
+                "attrs_values": [
+                    [
+                        "transtype",
+                        "live"
+                    ],
+                    [
+                        "rcvbuf",
+                        "1000000000"
+                    ],
+                    [
+                        "sndbuf",
+                        "1000000000"
+                    ]
+                ],
+                "options_values": [
+                    [
+                        "--msgsize",
+                        "1316"
+                    ]
+                ],
+                "statsdir": "_results",
+                "statsfreq": "100"
+            },
+            "runner_type": "remote-runner",
+            "runner_config": {
+                "username": "msharabayko",
+                "host": "40.69.89.21"
+            },
+            "sleep_after_start": null,
+            "sleep_after_stop": null,
+            "stop_order": null
+        },
+        "4": {
+            "obj_type": "srt-xtransmit",
+            "obj_config": {
+                "type": "snd",
+                "path": "/home/msharabayko/projects/srt/srt-xtransmit/_build/bin/srt-xtransmit",
+                "port": "4200",
+                "host": "40.69.89.21",
+                "attrs_values": [
+                    [
+                        "transtype",
+                        "live"
+                    ],
+                    [
+                        "rcvbuf",
+                        "1000000000"
+                    ],
+                    [
+                        "sndbuf",
+                        "1000000000"
+                    ]
+                ],
+                "options_values": [
+                    [
+                        "--msgsize",
+                        "1316"
+                    ],
+                    [
+                        "--sendrate",
+                        "15Mbps"
+                    ],
+                    [
+                        "--duration",
+                        "30"
+                    ]
+                ],
+                "statsdir": "_results",
+                "statsfreq": "100"
+            },
+            "runner_type": "remote-runner",
+            "runner_config": {
+                "username": "msharabayko",
+                "host": "23.96.93.54"
+            },
+            "sleep_after_start": null,
+            "sleep_after_stop": null,
+            "stop_order": null
+        }
+    }
+}
