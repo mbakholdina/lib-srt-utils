@@ -4,6 +4,7 @@ single experiments.
 """
 import json
 import logging
+import os
 import pprint
 import time
 
@@ -36,7 +37,14 @@ def create_task_config(
     }
 
 
-def create_experiment_config(resultsdir: str):
+def create_experiment_config(config_path: str, resultsdir: str):
+    if os.path.exists(config_path):
+        logger.error(
+            'Specified config path already exists, please restart '
+            'the script with non-existing one'
+        )
+        return
+
     logger.info('Creating experiment config')
 
     LORUNNER_CONFIG = {}
@@ -137,26 +145,29 @@ def create_experiment_config(resultsdir: str):
     pp = pprint.PrettyPrinter(indent=2)
     pp.pprint(config)
 
-    # TODO: Make config path option
-    with open("config.json", "w") as write_file:
+    with open(config_path, "w") as write_file:
         json.dump(config, write_file, indent=4)
 
     return config
 
 
 @click.command()
+@click.argument(
+    'config_path',
+    type=click.Path()
+)
 @click.option(
     '--resultsdir',
     required=True,
     help =  'Directory path to store experiment results.'
 )
-def main(resultsdir):
+def main(config_path, resultsdir):
     logging.basicConfig(
         level=logging.INFO,
         format='%(asctime)-15s [%(levelname)s] %(message)s',
     )
 
-    config = create_experiment_config(resultsdir)
+    config = create_experiment_config(config_path, resultsdir)
 
     try:
         exp_runner = SingleExperimentRunner.from_config(config)
