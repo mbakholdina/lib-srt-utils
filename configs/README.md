@@ -8,7 +8,7 @@
 | lore_xtransmit_live.json           | Local-remote setup, `srt-xtransmit` application is used for transmission, live mode |          |
 | lore_xtransmit_live_duration       | Local-remote setup, `set-xtransmit` application is used for transmission, live mode, `--duration` option of `srt-xtransmit` is used to control the time of data transmission |          |
 | TODO: lolo_xtransmit_live_duration |                                                              |          |
-| TODO: rere_xtransmit_live_duration |                                                              |          |
+| rere_xtransmit_live_duration       | Remote-remote setup, `set-xtransmit` application is used for transmission, live mode, `--duration` option of `srt-xtransmit` is used to control the time of data transmission |          |
 | TODO: lore_xtransmit_file_duration |                                                              |          |
 | TODO: rere_xtransmit_file_duration |                                                              |          |
 |                                    |                                                              |          |
@@ -66,4 +66,20 @@ ssh -tt -o BatchMode=yes -o ConnectTimeout=10 msharabayko@40.69.89.21 '/home/msh
 
 # Task 4
 ../srt-xtransmit/_build/bin/srt-xtransmit generate "srt://40.69.89.21:4200?transtype=live&rcvbuf=1000000000&sndbuf=1000000000" --msgsize 1316 --sendrate 15Mbps --duration 30 --statsfile _results/srt-xtransmit-stats-snd.csv --statsfreq 100
+```
+
+## rere_xtransmit_live_duration
+
+```
+# Task 1
+ssh -tt -o BatchMode=yes -o ConnectTimeout=10 msharabayko@23.96.93.54 'tshark -i eth0 -f "udp port 4200" -s 1500 -w _results/tshark-trace-file.pcapng'
+
+# Task 2
+ssh -tt -o BatchMode=yes -o ConnectTimeout=10 msharabayko@40.69.89.21 'tshark -i eth0 -f "udp port 4200" -s 1500 -w _results/tshark-trace-file.pcapng'
+
+# Task 3
+ssh -tt -o BatchMode=yes -o ConnectTimeout=10 msharabayko@40.69.89.21 '/home/msharabayko/projects/srt/srt-xtransmit/_build/bin/srt-xtransmit receive "srt://:4200?transtype=live&rcvbuf=1000000000&sndbuf=1000000000" --msgsize 1316 --statsfile _results/srt-xtransmit-stats-rcv.csv --statsfreq 100'
+
+# Task 4
+ssh -tt -o BatchMode=yes -o ConnectTimeout=10 msharabayko@23.96.93.54 '/home/msharabayko/projects/srt/srt-xtransmit/_build/bin/srt-xtransmit generate "srt://40.69.89.21:4200?transtype=live&rcvbuf=1000000000&sndbuf=1000000000" --msgsize 1316 --sendrate 15Mbps --duration 30 --statsfile _results/srt-xtransmit-stats-snd.csv --statsfreq 100'
 ```
