@@ -7,7 +7,7 @@ from srt_utils.runners import SimpleFactory
 CONFIG_0 = {
     'type': 'rcv',
     'path': '../srt-xtransmit/_build/bin/srt-xtransmit',
-    'port': '4200',
+    'port': '4200'
 }
 ARGS_0 = ['../srt-xtransmit/_build/bin/srt-xtransmit', 'receive', 'srt://:4200']
 ARGSSTR_0 = '../srt-xtransmit/_build/bin/srt-xtransmit receive "srt://:4200"'
@@ -17,7 +17,7 @@ CONFIG_1 = {
     'type': 'rcv',
     'path': '../srt-xtransmit/_build/bin/srt-xtransmit',
     'port': '4200',
-    'host': '',
+    'host': ''
 }
 ARGS_1 = ARGS_0
 ARGSSTR_1 = ARGSSTR_0
@@ -42,7 +42,7 @@ CONFIG_3 = {
     'type': 'snd',
     'path': '../srt-xtransmit/_build/bin/srt-xtransmit',
     'port': '4200',
-    'host': '127.0.0.1',
+    'host': '127.0.0.1'
 }
 ARGS_3 = ['../srt-xtransmit/_build/bin/srt-xtransmit', 'generate', 'srt://127.0.0.1:4200']
 ARGSSTR_3 = '../srt-xtransmit/_build/bin/srt-xtransmit generate "srt://127.0.0.1:4200"'
@@ -57,7 +57,7 @@ CONFIG_4 = {
         ('transtype', 'live'),
         ('rcvbuf', '1000000000'),
         ('sndbuf', '1000000000'),
-    ],
+    ]
 }
 ARGS_4 = [
     '../srt-xtransmit/_build/bin/srt-xtransmit', 'generate',
@@ -76,7 +76,7 @@ CONFIG_5 = {
         ('--msgsize', '1316'),
         ('--sendrate', '15Mbps'),
         ('--duration', '10s'),
-    ],
+    ]
 }
 ARGS_5 = [
     '../srt-xtransmit/_build/bin/srt-xtransmit', 'generate',
@@ -86,15 +86,40 @@ ARGS_5 = [
 ARGSSTR_5 = '../srt-xtransmit/_build/bin/srt-xtransmit generate ' \
     '"srt://127.0.0.1:4200" --msgsize 1316 --sendrate 15Mbps --duration 10s'
 
-
 CONFIG_6 = {
+    'type': 'rcv',
+    'path': '../srt-xtransmit/_build/bin/srt-xtransmit',
+    'port': '4200',
+    'statsdir': '_results',
+    'statsfreq': '100',
+    'prefix': 'prefix'
+}
+ARGS_6 = [
+    '../srt-xtransmit/_build/bin/srt-xtransmit', 'receive', 'srt://:4200',
+    '--statsfile', '_results/prefix-srt-xtransmit-stats-rcv.csv', '--statsfreq', '100'
+]
+ARGSSTR_6 = '../srt-xtransmit/_build/bin/srt-xtransmit receive "srt://:4200" ' \
+    '--statsfile _results/prefix-srt-xtransmit-stats-rcv.csv --statsfreq 100'
+
+CONFIG_7 = {
+    'path': 'tshark',
+    'interface': 'en0',
+    'port': '4200',
+    'dirpath': '_results'
+}
+ARGS_7 = ['tshark', '-i', 'en0', '-f', 'udp port 4200', '-s', '1500', '-w', '_results/tshark-tracefile.pcapng']
+ARGSSTR_7 = 'tshark -i en0 -f "udp port 4200" -s 1500 -w _results/tshark-tracefile.pcapng'
+
+CONFIG_8 = {
     'path': 'tshark',
     'interface': 'en0',
     'port': '4200',
     'dirpath': '_results',
+    'prefix': 'prefix'
 }
-ARGS_6 = ['tshark', '-i', 'en0', '-f', 'udp port 4200', '-s', '1500', '-w', '_results/tshark-trace-file.pcapng']
-ARGSSTR_6 = 'tshark -i en0 -f "udp port 4200" -s 1500 -w _results/tshark-trace-file.pcapng'
+ARGS_8 = ['tshark', '-i', 'en0', '-f', 'udp port 4200', '-s', '1500', '-w', '_results/prefix-tshark-tracefile.pcapng']
+ARGSSTR_8 = 'tshark -i en0 -f "udp port 4200" -s 1500 -w _results/prefix-tshark-tracefile.pcapng'
+
 
 
 CONFIG_ARGS = [
@@ -104,7 +129,9 @@ CONFIG_ARGS = [
     ('srt-xtransmit', CONFIG_3, ARGS_3),
     ('srt-xtransmit', CONFIG_4, ARGS_4),
     ('srt-xtransmit', CONFIG_5, ARGS_5),
-    ('tshark', CONFIG_6, ARGS_6),
+    ('srt-xtransmit', CONFIG_6, ARGS_6),
+    ('tshark', CONFIG_7, ARGS_7),
+    ('tshark', CONFIG_8, ARGS_8),
 ]
 
 
@@ -115,7 +142,9 @@ CONFIG_ARGSSTRS = [
     ('srt-xtransmit', CONFIG_3, ARGSSTR_3),
     ('srt-xtransmit', CONFIG_4, ARGSSTR_4),
     ('srt-xtransmit', CONFIG_5, ARGSSTR_5),
-    ('tshark', CONFIG_6, ARGSSTR_6),
+    ('srt-xtransmit', CONFIG_6, ARGSSTR_6),
+    ('tshark', CONFIG_7, ARGSSTR_7),
+    ('tshark', CONFIG_8, ARGSSTR_8),
 ]
 
 

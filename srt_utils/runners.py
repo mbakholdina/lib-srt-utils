@@ -50,7 +50,7 @@ class Task:
 
     def __init__(
         self,
-        name: str,
+        key: str,
         obj: objects.IObject,
         obj_runner: object_runners.IObjectRunner,
         config: dict
@@ -65,8 +65,8 @@ class Task:
         
         Task should be treated as a combination
         Attributes:
-            name:
-                Task name.
+            key:
+                Task key.
             obj:
                 `objects.IObject` object to run.
             obj_runner:
@@ -89,7 +89,7 @@ class Task:
             'stop_order': 1                     # optional
         }
         """
-        self.name = name
+        self.key = key
         self.obj = obj
         self.obj_runner = obj_runner
         self.sleep_after_start = config.get('sleep_after_start')
@@ -98,7 +98,7 @@ class Task:
 
 
     def __str__(self):
-        return f'{self.name}'
+        return f'task-{self.key}'
 
 
 class SingleExperimentRunner:
@@ -134,12 +134,14 @@ class SingleExperimentRunner:
         self.tasks = []
         factory = SimpleFactory()
 
-        for task_key, task_config in tasks:
-            name = 'task-' + task_key
-            obj = factory.create_object(task_config['obj_type'], task_config['obj_config'])
-            task_config['runner_config']['collect_results_path'] = self.collect_results_path
-            obj_runner = factory.create_runner(obj, task_config['runner_type'], task_config['runner_config'])
-            self.tasks += [Task(name, obj, obj_runner, task_config)]
+        for key, config in tasks:
+            config['obj_config']['prefix'] = key
+            config['runner_config']['collect_results_path'] = self.collect_results_path
+
+            obj = factory.create_object(config['obj_type'], config['obj_config'])
+            obj_runner = factory.create_runner(obj, config['runner_type'], config['runner_config'])
+
+            self.tasks += [Task(key, obj, obj_runner, config)]
 
         self.is_started = False
         self.is_stopped = False
