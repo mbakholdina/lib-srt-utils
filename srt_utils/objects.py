@@ -93,7 +93,14 @@ class IObject(ABC):
 
 class Tshark(IObject):
 
-    def __init__(self, path: str, interface: str, port: str, dirpath: str):
+    def __init__(
+        self,
+        path: str,
+        interface: str,
+        port: str,
+        dirpath: str,
+        prefix: typing.Optional[str]=None
+    ):
         """
         An object for `tshark` application.
 
@@ -109,13 +116,25 @@ class Tshark(IObject):
                 Port to listen and capture the traffic.
             dirpath:
                 Dirpath to store output .pcapng trace file.
+            prefix:
+                Prefix to construct output filename.
         """
         super().__init__('tshark')
         self.path = path
         self.interface = interface
         self.port = port
+
+        if prefix is not None:
+            filename = f'{prefix}-{self.name}-tracefile'
+        else:
+            filename = f'{self.name}-tracefile'
+
+        # TODO: For being able to implement unique names
+        # self.pattern = filename + '-{:03d}.pcapng'
+        filename += '.pcapng'
+
         self.dirpath = pathlib.Path(dirpath)
-        self.filepath = self.dirpath / f'{self.name}-trace-file.pcapng'
+        self.filepath = self.dirpath / filename
 
 
     @classmethod
@@ -125,15 +144,17 @@ class Tshark(IObject):
             config = {
                 'path': 'tshark',               # Path to tshark application
                 'interface': 'en0',             # Interface to listen and capture the traffic
-                'port': '4200',                   # Port to listen and capture the traffic
+                'port': '4200',                 # Port to listen and capture the traffic
                 'dirpath': '_results',          # Dirpath to store output .pcapng trace file
+                'prefix': '1'                   # Prefix to construct output filename, optional
             }
         """
         return cls(
             config['path'],
             config['interface'],
             config['port'],
-            config['dirpath']
+            config['dirpath'],
+            config.get('prefix')
         )
 
 
@@ -189,7 +210,8 @@ class SrtXtransmit(IObject):
         attrs_values: typing.Optional[typing.List[typing.Tuple[str, str]]]=None,
         options_values: typing.Optional[typing.List[typing.Tuple[str, str]]]=None,
         statsdir: typing.Optional[str]=None,
-        statsfreq: typing.Optional[str]=None
+        statsfreq: typing.Optional[str]=None,
+        prefix: typing.Optional[str]=None
     ):
         """
         An object for `srt-xtransmit` test application.
@@ -220,6 +242,8 @@ class SrtXtransmit(IObject):
                 statistics will not be collected.
             statsfreq:
                 Frequency of SRT statistics collection, in ms, optional.
+            prefix:
+                Prefix to construct output filename.
         """
         super().__init__('srt-xtransmit')
         self.type = type
@@ -231,8 +255,18 @@ class SrtXtransmit(IObject):
         self.statsfreq = statsfreq
 
         if statsdir is not None:
+
+            if prefix is not None:
+                filename = f'{prefix}-{self.name}-stats-{self.type}'
+            else:
+                filename = f'{self.name}-stats-{self.type}'
+
+            # TODO: For being able to implement unique names
+            # self.pattern = filename + '-{:03d}.csv'
+            filename += '.csv'
+
             self.dirpath = pathlib.Path(statsdir)
-            self.filepath = self.dirpath / f'{self.name}-stats-{self.type}.csv'
+            self.filepath = self.dirpath / filename
 
 
     @classmethod
@@ -253,7 +287,8 @@ class SrtXtransmit(IObject):
                     ('--msgsize', '1316'),
                 ],
                 'statsdir': '_results',                                     # Dirpath to collect SRT statistics, optional. If not specified, statistics will not be collected
-                'statsfreq': '100'                                          # Frequency of SRT statistics collection, in ms, optional
+                'statsfreq': '100',                                         # Frequency of SRT statistics collection, in ms, optional
+                'prefix': '1-rcv1'                                          # Prefix to construct output filename, optional
             }
 
         Suggested additional fields:
@@ -268,7 +303,8 @@ class SrtXtransmit(IObject):
             config.get('attrs_values'),
             config.get('options_values'),
             config.get('statsdir'),
-            config.get('statsfreq')
+            config.get('statsfreq'),
+            config.get('prefix')
         )
 
 
