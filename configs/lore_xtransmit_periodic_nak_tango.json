@@ -1,0 +1,101 @@
+{
+    "collect_results_path": "_experiment_results",
+    "stop_after": 130,
+    "ignore_stop_order": true,
+    "tasks": {
+        "1": {
+            "obj_type": "srt-xtransmit",
+            "obj_config": {
+                "type": "rcv",
+                "path": "/home/msharabayko/Projects/srt/srt-xtransmit/_build/bin-master/srt-xtransmit",
+                "port": "4200",
+                "attrs_values": [
+                    [
+                        "transtype",
+                        "live"
+                    ],
+                    [
+                        "rcvbuf",
+                        "1000000000"
+                    ],
+                    [
+                        "sndbuf",
+                        "1000000000"
+                    ],
+                    [
+                        "latency",
+                        "120"
+                    ]
+                ],
+                "options_values": [
+                    [
+                        "--msgsize",
+                        "1316"
+                    ]
+                ],
+                "statsdir": "/home/msharabayko/Projects/srt/srt-xtransmit/_results",
+                "statsfreq": "1s"
+            },
+            "runner_type": "remote-runner",
+            "runner_config": {
+                "username": "msharabayko",
+                "host": "10.129.10.165"
+            },
+            "sleep_after_start": null,
+            "sleep_after_stop": null,
+            "stop_order": null
+        },
+        "2": {
+            "obj_type": "srt-xtransmit",
+            "obj_config": {
+                "type": "snd",
+                "path": "/mnt/d/Projects/srt/srt-xtransmit-gh/_build_lin/bin/srt-xtransmit",
+                "port": "4200",
+                "host": "192.168.0.7",
+                "attrs_values": [
+                    [
+                        "transtype",
+                        "live"
+                    ],
+                    [
+                        "rcvbuf",
+                        "1000000000"
+                    ],
+                    [
+                        "sndbuf",
+                        "1000000000"
+                    ],
+                    [
+                        "latency",
+                        "120"
+                    ],
+                    [
+                        "tango",
+                        "1"
+                    ]
+                ],
+                "options_values": [
+                    [
+                        "--msgsize",
+                        "1316"
+                    ],
+                    [
+                        "--sendrate",
+                        "7Mbps"
+                    ],
+                    [
+                        "--duration",
+                        "120"
+                    ]
+                ],
+                "statsdir": "/mnt/d/Projects/srt/srt-xtransmit-gh/_results",
+                "statsfreq": "1s"
+            },
+            "runner_type": "local-runner",
+            "runner_config": {},
+            "sleep_after_start": null,
+            "sleep_after_stop": null,
+            "stop_order": null
+        }
+    }
+}
