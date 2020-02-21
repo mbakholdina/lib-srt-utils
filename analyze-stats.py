@@ -12,31 +12,16 @@ def extract_features(rcv, snd):
     sent = snd['pktSent'].sum()
     rexmits = snd['pktRetrans'].sum()
     droped = rcv['pktRcvDrop'].sum()
-    return (rexmits / sent) * 100, (droped / sent) * 100
 
-def create_dataframe_take_1():
-    columns = ['lossratio', 'rtt', 'sendrate', 'df']
-    db = pd.DataFrame(columns = columns)
+    rcv_buffer_size = rcv['byteAvailRcvBuf'].iloc[0]
+    fullness = rcv_buffer_size - rcv['byteAvailRcvBuf']
+    max_fullness = fullness.max()
 
-    path_prefix = '_stats_nak/_loss8_latency_'
-    rcv_suffix = 'msharabayko@10.129.10.165/1-srt-xtransmit-stats-rcv.csv'
-    snd_suffix = 'local/2-srt-xtransmit-stats-snd.csv'
-
-    df_experiment = pd.DataFrame(columns = ["REXMITS", "DROPS"])
-    df_experiment.index.name = 'latency'
-    for latency in range(25, 160, 5):
-        path = path_prefix + str(latency) + '/'
-        rcv, snd = load_csv_stats(path + rcv_suffix, path + snd_suffix)
-        rex, drop = extract_features(rcv, snd)
-        df_experiment.loc[latency] = [rex, drop]
-        
-    print(df_experiment)
-    db = db.append({8, 54, 7, df_experiment}, ignore_index=True)
-    print(db)
+    return (rexmits / sent) * 100, (droped / sent) * 100, max_fullness
 
 def create_dataframe():
     # TODO: add 'alg' column
-    columns = ['lossratio', 'rtt', 'sendrate', 'algo', 'latency', "rexmits", "drops"]
+    columns = ['lossratio', 'rtt', 'sendrate', 'algo', 'latency', "rexmits", "drops", "rcvbuffill"]
     db = pd.DataFrame(columns = columns)
 
     path_prefix = '_stats_nak/_loss8_latency_'
@@ -48,8 +33,8 @@ def create_dataframe():
         for latency in range(25, 160, 5):
             path = path_prefix + str(latency) + '/'
             rcv, snd = load_csv_stats(path + rcv_suffix, path + snd_suffix)
-            rex, drop = extract_features(rcv, snd)
-            row = pd.DataFrame([[8, 54, 7, algo, latency, rex, drop]], columns = columns)
+            rex, drop, rcvbuffill = extract_features(rcv, snd)
+            row = pd.DataFrame([[8, 54, 7, algo, latency, rex, drop, rcvbuffill]], columns = columns)
             db = db.append(row)
 
     db['latenxyxrtt'] = db.latency / db.rtt
@@ -86,6 +71,9 @@ def plot_rexmit_drops(db, sendrate, loss, rtt, algs):
     for alg in algs:
         indexer_alg = db.algo == alg
         indexer = indexer_alg & (db.lossratio == loss) & (db.sendrate == sendrate) & (db.rtt == rtt)
+        if db[indexer].empty:
+            print(f"ERROR! No data for {alg}.")
+            continue
 
         db[indexer].plot(x='latenxyxrtt', y='drops',   kind="line", linestyle='-', marker='o', ax=ax1)
         db[indexer].plot(x='latenxyxrtt', y='rexmits', kind="line", linestyle='-', marker='x', ax=ax2)
@@ -103,8 +91,45 @@ def plot_rexmit_drops(db, sendrate, loss, rtt, algs):
     ax2.set_xlabel("Latency (times RTT)")
     plt.show()
 
+def calc_rcv_buf_bytes(rtt_ms, bps, latency_ms):
+    return (latency_ms + rtt_ms / 2) * bps / 1000 / 8
+
+def plot_buffer_fullness(db, sendrate, loss, rtt, algs):
+    db['latenxyxrtt'] = db.latency / db.rtt
+
+    f, (ax1) = plt.subplots(1, 1, sharex=True)
+    f.canvas.set_window_title('Test')
+
+    expected = pd.DataFrame()
+
+    for alg in algs:
+        indexer_alg = db.algo == alg
+        indexer = indexer_alg & (db.lossratio == loss) & (db.sendrate == sendrate) & (db.rtt == rtt)
+        if db[indexer].empty:
+            print(f"ERROR! No data for {alg}.")
+            continue
+
+        db[indexer].plot(x='latenxyxrtt', y='rcvbuffill',   kind="line", linestyle='-', marker='o', ax=ax1)
+        if expected.empty:
+            expected = db[indexer][['latenxyxrtt', 'rcvbuffill']].copy()
+
+    for _, row in expected.iterrows():
+        latency_ms = row['latenxyxrtt'] * rtt
+        row['rcvbuffill'] = calc_rcv_buf_bytes(rtt, sendrate * 1_000_000, latency_ms)
+    expected.plot(x='latenxyxrtt', y='rcvbuffill',   kind="line", linestyle='--', marker='o', ax=ax1)
+
+    f.suptitle('Loss {}%, RTT {}ms, Sendrate {} Mbps'.format(loss, rtt, sendrate))
+
+    ax1.set_title('Receiver buffer fullness')
+    ax1.legend(algs + ['Prediction'])
+    ax1.set_ylabel("Bytes")
+    ax1.set_xlabel("Latency (times RTT)")
+
+    plt.show()
+
+
 def load_dataset(desc, root_dir):
-    columns = ['lossratio', 'rtt', 'sendrate', 'algo', 'latency', "rexmits", "drops"]
+    columns = ['lossratio', 'rtt', 'sendrate', 'algo', 'latency', "rexmits", "drops", "rcvbuffill"]
     db = pd.DataFrame(columns = columns)
 
     path_prefix = root_dir + desc['path']
@@ -123,8 +148,8 @@ def load_dataset(desc, root_dir):
         rcvcsv = path + '/'+ desc['rcvcsv']
         sndcsv = path + '/'+ desc['sndcsv']
         rcv, snd = load_csv_stats(rcvcsv, sndcsv)
-        rex, drop = extract_features(rcv, snd)
-        row = pd.DataFrame([[loss, rtt, rate, algo, latency, rex, drop]], columns = columns)
+        rex, drop, rcvbuf = extract_features(rcv, snd)
+        row = pd.DataFrame([[loss, rtt, rate, algo, latency, rex, drop, rcvbuf]], columns = columns)
         db = db.append(row)
 
     return db
@@ -145,6 +170,12 @@ def load_datasets():
         'sndcsv': '2-srt-xtransmit-stats-snd.csv'
     }
 
+    periodic_nak_loss4 = periodic_nak_loss8.copy()
+    periodic_nak_loss4['loss'] = 4
+
+    periodic_nak_loss0 = periodic_nak_loss8.copy()
+    periodic_nak_loss0['loss'] = 0
+
     periodic_nak_off_loss8 = {
         'name': 'Periodic NAK Off',
         'path': 'periodic_nak_off/',
@@ -158,6 +189,13 @@ def load_datasets():
         'rcvcsv': '1-srt-xtransmit-stats-rcv.csv',
         'sndcsv': '2-srt-xtransmit-stats-snd.csv'
     }
+
+    periodic_nak_off_loss4 = periodic_nak_off_loss8.copy()
+    periodic_nak_off_loss4['loss'] = 4
+    periodic_nak_off_loss4['latency_max'] = 190
+
+    periodic_nak_off_loss0 = periodic_nak_off_loss8.copy()
+    periodic_nak_off_loss0['loss'] = 0
 
     periodic_nak_tango2_loss8 = {
         'name': 'Periodic NAK Tango2',
@@ -173,47 +211,32 @@ def load_datasets():
         'sndcsv': '2-srt-xtransmit-stats-snd.csv'
     }
 
-    periodic_nak_loss4 = {
-        'name': 'Periodic NAK',
-        'path': 'periodic_nak/',
-        'loss': 4,
-        'rate': 7,
-        'rtt': 54,
-        'latency_min': 25,
-        'latency_max': 250,
-        'latency_step': 5,
-        'fldr': 'loss{}_rate{}_latency_{}',
-        'rcvcsv': '1-srt-xtransmit-stats-rcv.csv',
-        'sndcsv': '2-srt-xtransmit-stats-snd.csv'
-    }
+    periodic_nak_tango2_loss4 = periodic_nak_tango2_loss8.copy()
+    periodic_nak_tango2_loss4['loss'] = 4
 
-    periodic_nak_tango2_loss4 = {
-        'name': 'Periodic NAK Tango2',
-        'path': 'periodic_nak_tango_2/',
-        'loss': 4,
-        'rate': 7,
-        'rtt': 54,
-        'latency_min': 25,
-        'latency_max': 250,
-        'latency_step': 5,
-        'fldr': 'loss{}_rate{}_latency_{}',
-        'rcvcsv': '1-srt-xtransmit-stats-rcv.csv',
-        'sndcsv': '2-srt-xtransmit-stats-snd.csv'
-    }
+    periodic_nak_tango2_loss0 = periodic_nak_tango2_loss4.copy()
+    periodic_nak_tango2_loss0['loss'] = 0
     
-    root_path = '..\\Periodic-NAK-DataSet-1\\'
-    db = load_dataset(periodic_nak_loss8, root_path)
-    #db = db.append(load_dataset(periodic_nak_off_loss8, root_path))
-    #db = db.append(load_dataset(periodic_nak_tango2_loss8, root_path))
-    db = db.append(load_dataset(periodic_nak_loss4, root_path))
+    root_path = 'd:\\tests\\srt\\Periodic-NAK-DataSet-1\\'
+    db = load_dataset(periodic_nak_loss8, root_path) \
+        .append(load_dataset(periodic_nak_loss4, root_path)) \
+        .append(load_dataset(periodic_nak_loss0, root_path))
+    db = db.append(load_dataset(periodic_nak_off_loss8, root_path)) \
+        .append(load_dataset(periodic_nak_off_loss4, root_path)) \
+        .append(load_dataset(periodic_nak_off_loss0, root_path))
+    db = db.append(load_dataset(periodic_nak_tango2_loss8, root_path))
     db = db.append(load_dataset(periodic_nak_tango2_loss4, root_path))
+    db = db.append(load_dataset(periodic_nak_tango2_loss0, root_path))
     print(db)
+    print(periodic_nak_tango2_loss8)
 
     #algs = [periodic_nak_loss8['name'], periodic_nak_off_loss8['name'], periodic_nak_tango2_loss8['name']]
     #plot_rexmit_drops(db, 7, 8, 54, algs)
 
-    algs = [periodic_nak_loss4['name'], periodic_nak_tango2_loss4['name']]
-    plot_rexmit_drops(db, 7, 4, 54, algs)
+    algs = [periodic_nak_loss8['name'], periodic_nak_tango2_loss0['name']]
+    #plot_rexmit_drops(db, 7, 8, 54, algs)
+
+    plot_buffer_fullness(db, 7, 8, 54, algs)
 
 
 def main():
