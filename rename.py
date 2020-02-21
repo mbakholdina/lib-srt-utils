@@ -8,7 +8,7 @@ import click
 import sys
 
 def main():
-    path = 'c:\\Users\\maxlo\\Projects\\srt\\Periodic-NAK-DataSet-1\\periodic_nak\\'
+    path = 'd:\\tests\\srt\\Periodic-NAK-DataSet-1\\periodic_nak_off\\'
 
     for src_dir, dirs, files in os.walk(path):
         print(src_dir)
