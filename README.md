@@ -1,17 +1,40 @@
 # lib-srt-utils
 
-A Python library containing supporting code for running [SRT](https://github.com/Haivision/srt) tests.
+A Python library containing supporting code for running SRT tests based on the experiment config. [SRT](https://github.com/Haivision/srt) stands for Secure Reliable Transport and is an open source transport technology that optimizes streaming performance across unpredictable networks, such as the Internet. This is the next generation and improved version of [srt-test-runner](https://github.com/mbakholdina/srt-test-runner) script written in a form of library.
+
+An example of a single experiment, consisting of a defined set of steps, is the following:
+
+- Start `tshark` on the SRT sender side,
+
+- Start `tshark` on the SRT receiver side,
+
+- Start the SRT receiver,
+
+- Start the SRT sender,
+
+- Wait for the specified time to have SRT sender and receiver connected and SRT streaming finished,
+
+- Collect the experiment artefacts (SRT `.csv` statistics, `tshark` `.pcapng` dumps) to the machine where the script is running.
+
+Running the tasks is implemented both locally and remotely so that the following combinations are possible: local-local, local-remote and remote-remote setup. All the implemented configs as well as the detailed documentation can be found in [configs](https://github.com/mbakholdina/lib-srt-utils/tree/master/configs) folder. [Here](https://github.com/mbakholdina/lib-srt-utils/blob/master/configs/rere_xtransmit_live_duration.json) is an example of the remote-remote config where `tshark` and `srt-xtransmit` applications are started consequtively on 2 remote machines (virtual machines in the cloud or regular machines), the SRT transmission is happening and once finished the experiment artefacts are collected to the machine where the script is running.
+
+The `SingleExperimentRunner` class, see [srt_utils/runners.py](https://github.com/mbakholdina/lib-srt-utils/blob/master/srt_utils/runners.py), implements the logic of running a single experiment based on the experiment config. An example of the `SingleExperimentRunner` class usage can be found in [scripts/experiment_runner.py](https://github.com/mbakholdina/lib-srt-utils/blob/master/scripts/experiment_runner.py) script designed to run a single experiment.
+
+An implementation of the `TestRunner` class responsible for running a single test (a set of experiments executed in a consecutive order with the different input parameters) is planned for future. The same experiment example as above, however, the same steps are performed several times, e.g., to test SRT live streaming mode with different values of bitrate. In this case, bitrate value is that particular input parameter that is changed from experiment to experiment during the test.
+
+Important to note, that currently only `tshark` and [srt-xtransmit](https://github.com/maxsharabayko/srt-xtransmit) test application are supported. [srt-live-transmit](https://github.com/Haivision/srt/blob/master/docs/srt-live-transmit.md) and other applications can be added by request.
+
+
+
 
 # Getting Started
 
 ## Requirements
 
 * python 3.6+
-* tshark, setting up tshark is described [here](https://github.com/mbakholdina/srt-test-runner) <!-- Add link to CookBook -->
-* ssh-agent
-* `srt-xtransmit` test application
-
-<!-- Few words about setting up tshark, ssh-agent and test applications -->
+* tshark, setting up tshark is described in [SRT Cookbook](https://srtlab.github.io/srt-cookbook/apps/wireshark/) and [srt-test-runner documentation](https://github.com/mbakholdina/srt-test-runner)
+* ssh-agent, setting up SSH keys and ssh-agent is described in [SRT Cookbook](https://srtlab.github.io/srt-cookbook/how-to-articles/how-to-work-with-ssh-keys/)
+* [srt-xtransmit](https://github.com/maxsharabayko/srt-xtransmit) test application
 
 ## Install the library with pip
 
