@@ -66,10 +66,10 @@ The task represents one step of a single experiment and contains both the inform
 ```
 "obj_type": "tshark",
 "obj_config": {
-		"path": "tshark",
-		"interface": "en0",
-		"port": "4200",
-		"dirpath": "_results"
+    "path": "tshark",
+    "interface": "en0",
+    "port": "4200",
+    "dirpath": "_results"
 },
 ```
 
@@ -86,27 +86,27 @@ The task represents one step of a single experiment and contains both the inform
 ```
 "obj_type": "srt-xtransmit",
 "obj_config": {
-		"type": "snd",
+    "type": "snd",
     "path": "/home/msharabayko/projects/srt/srt-xtransmit/_build/bin/srt-xtransmit",
     "port": "4200",
     "host": "40.69.89.21",
     "attrs_values": [
-    		[
-        		"transtype",
+        [
+            "transtype",
             "live"
         ],
         [
-        		"rcvbuf",
+            "rcvbuf",
             "1000000000"
         ],
         [
-        		"sndbuf",
+            "sndbuf",
             "1000000000"
         ]
     ],
-		"options_values": [
-    		[
-        		"--msgsize",
+    "options_values": [
+        [
+            "--msgsize",
             "1316"
         ],
         [
@@ -117,7 +117,7 @@ The task represents one step of a single experiment and contains both the inform
             "--duration",
             "30"
         ]
-		],
+    ],
     "statsdir": "_results",
     "statsfreq": "10"
 },
@@ -155,7 +155,7 @@ The config is empty in case `local-runner` usage:
 ```
 "runner_type": "remote-runner",
 "runner_config": {
-		"username": "msharabayko",
+    "username": "msharabayko",
     "host": "40.69.89.21"
 },
 ```
