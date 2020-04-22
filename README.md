@@ -24,9 +24,6 @@ An implementation of the `TestRunner` class responsible for running a single tes
 
 Important to note, that currently only `tshark` and [srt-xtransmit](https://github.com/maxsharabayko/srt-xtransmit) test application are supported. [srt-live-transmit](https://github.com/Haivision/srt/blob/master/docs/srt-live-transmit.md) and other applications can be added by request.
 
-
-
-
 # Getting Started
 
 ## Requirements
@@ -42,10 +39,11 @@ For development, it is recommended
 * To use `venv` for virtual environments and `pip` for installing the library and any dependencies. This ensures the code and dependencies are isolated from the system Python installation,
 * To install the library in “editable” mode by running from the same directory `pip install -e .`. This lets changing the source code (both tests and library) and rerunning tests against library code at will. For regular installation, use `pip install .`.
 
-<!-- Revise this -->
+
 As soon as the library is installed, you can run modules directly
+
 ```
-venv/bin/python -m srt_utils.script --help
+venv/bin/python -m srt_utils.module --help
 ```
 
 or use preinstalled executable scripts
@@ -55,9 +53,7 @@ venv/bin/script --help
 
 ## Install the library to import in another project
 
-<!-- Revise this -->
-
-Install with pip (a venv is recommended), using pip's VCS requirement specifier
+Install with `pip` (a `venv` is recommended), using pip's VCS requirement specifier
 ```
 pip install 'git+https://github.com/mbakholdina/lib-srt-utils.git@v0.1#egg=srt_utils'
 ```
@@ -83,17 +79,15 @@ import srt_utils.module as module
 
 ## Running the library
 
-<!-- Revise and delete this section afterwards -->
-
 Running unit tests:
 ```
 venv/bin/pytest --pyargs srt_utils
 venv/bin/python -m pytest --pyargs srt_utils
 ```
 
-Running modules, e.g. `script.py`:
+Running modules, e.g. `module.py`:
 ```
-venv/bin/python -m srt_utils.script
+venv/bin/python -m srt_utils.module
 ```
 
 Starting SSH-agent:
@@ -102,58 +96,53 @@ eval "$(ssh-agent -s)"
 ssh-add -K ~/.ssh/id_rsa
 ```
 
-Building `srt-xtransmit` test application on MacOS:
-```
-mkdir _build
-cd _build
-export OPENSSL_ROOT_DIR=$(brew --prefix openssl)
-export OPENSSL_LIB_DIR=$(brew --prefix openssl)"/lib"
-export OPENSSL_INCLUDE_DIR=$(brew --prefix openssl)"/include"
-cmake ../ -DENABLE_CXX17=OFF
-cmake --build ./
-```
+# Setting Up the Environment
 
+As mentioned above, running the tasks is implemented both locally and remotely so that the following combinations are possible: 
 
-# Setting up the environment
+- local-local: the script is running on the local machine, `thark` (single instance), SRT receiver and SRT sender are running on the same local machine,
+- local-remote: the script is running on the local machine, `thark` and SRT receiver are running on the remote machine, another `tshark` and SRT sender are running on the local machine where the script is running, 
+- and remote-remote setup: the script is running on a separate local machine, `thark` and SRT receiver are running on the first remote machine, another `tshark` and SRT sender are running on the second remote machine.
 
-<!-- Use cases -->
-<!-- Target OS -->
+## Supported OSs
 
-Local-Remote use case
+- MacOS / Ubuntu / CentOS (local-local)
 
-1. Generate SSH key on the local machine (the machine where the script will be launched) and copy it to the remote one for script to connect to remote machine and run the tasks on it via SSH.
+- MacOS &#8594; MacOS / Ubuntu / CentOS (local-remote)
+- MacOS &#8594; Ubuntu + Ubuntu / CentOS + CentOS (remote-remote) 
+- CentOS / Ubuntu &#8594; MacOS / Ubuntu / CentOS (local-remote) - to be tested
+- MacOS &#8594; MacOS + MacOS (remote-remote) - to be tested
+- CentOS / Ubuntu &#8594; MacOS + MacOS / Ubuntu + Ubuntu / CentOS + CentOS (remote-remote) - to be tested 
+- Any combinations with Windows - to be tested, there is no support for Windows implemented.
 
-<!-- ! Link to how to article -->
+## Steps to Do before Running the Script
 
-2. Install and set up `tshark` on both machines.
+1. Generate SSH key on the machine where the script will be launched and copy it to the remote machines for the script to connect to them and run the tasks via SSH. See the instructions in [SRT Cookbook](https://srtlab.github.io/srt-cookbook/how-to-articles/how-to-work-with-ssh-keys/).
 
-<!-- ! Link to how to article -->
+2. Install and set up `tshark` on both machines. The guidelines can be found [here](https://srtlab.github.io/srt-cookbook/apps/wireshark/).
 
 3. Build [srt-xtransmit](https://github.com/maxsharabayko/srt-xtransmit) or any other test application required for running a particular experiment config on both machines.
 
-<!-- Link to srt-xtransmit -->
-<!-- Link to the section with experiment config -->
+4. On the local machine where the script is going to be executed, create the directory for the `lib-srt-utils` project and clone the source code in it:
 
-4. On the local machine, create the directory for the `lib-srt-utils` project and clone the source code in here:
-```
-mkdir -p projects/srt/lib-srt-utils
-cd projects/srt
-git clone https://github.com/mbakholdina/lib-srt-utils.git lib-srt-utils
-```
-
+   ```
+   mkdir -p projects/srt/lib-srt-utils
+   cd projects/srt
+   git clone https://github.com/mbakholdina/lib-srt-utils.git lib-srt-utils
+   ```
 5. On the local machine, install `lib-srt-utils` library as per "Install the library with pip" section:
-```
-cd lib-srt-utils
-python3 -m venv venv
-venv/bin/pip install -e .
-```
 
-<!-- Running the script -->
+   ```
+   cd lib-srt-utils
+   python3 -m venv venv
+   venv/bin/pip install -e .
+   ```
+6. Update the experiment config as required. A set of predifend configs and appropriate documentaion can be found in `configs` folder.
 
-6. Update the experiment config ...
+7. On the local machine, start `ssh-agent` in the background and add your SSH private key generated at Step 1 to the `ssh-agent`. Without doing this, the script will raise an exception `paramiko.ssh_exception.SSHException`.
 
-7. Start ssh-agent in the background and add your SSH private key generated at Step 1 to the ssh-agent. Without doing this, scripts will raise an exception `paramiko.ssh_exception.SSHException`.
+8. Now you are ready to run the script.
 
-<!-- ! Link to how to article -->
+# Executable Scripts
 
-8. Run the script ... The results can be found here
+All the implemented scripts can be found in `scripts` folder. Please use [scripts/experiment_runner.py](https://github.com/mbakholdina/lib-srt-utils/blob/master/scripts/experiment_runner.py) script to run a single experiment based on the experiment config.
