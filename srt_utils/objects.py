@@ -135,6 +135,7 @@ class Tshark(IObject):
 
         self.dirpath = pathlib.Path(dirpath)
         self.filepath = self.dirpath / filename
+        self.network_condition = False
 
 
     @classmethod
@@ -253,6 +254,7 @@ class SrtXtransmit(IObject):
         self.attrs_values = attrs_values
         self.options_values = options_values
         self.statsfreq = statsfreq
+        self.network_condition = False
 
         if statsdir is not None:
 
@@ -382,10 +384,10 @@ class Netem(IObject):
 
     def __init__(
             self,
-            # interface: str,
-            # rules: typing.List[str]
-            interface,
-            rules,
+            interface: str,
+            rules: typing.List[str]
+            # interface,
+            # rules,
     ):
 
         super().__init__('netem')
@@ -404,21 +406,15 @@ class Netem(IObject):
 
     def make_args(self):
 
-        return [
-            'sudo',
-            'tc',
-            'qdisc',
-            'add',
-            'dev',
-            self.interface,
-            'root',
-            'netem',
-            # ' '.join(self.rules)
-            'delay',
-            '200ms',
-        ]
+        args = ['sudo', 'tc', 'qdisc', 'add', 'dev', self.interface, 'root', 'netem']
+
+        print(args)
+        for rule in self.rules:
+            args += rule.split(' ')
+        print(args)
+        return args
 
     def make_str(self):
         args = self.make_args()
-        args_str = f'{args[0]} {args[1]} root netem {args[2]}'
+        args_str = ' '.join(args)
         return args_str
