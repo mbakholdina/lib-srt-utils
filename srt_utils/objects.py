@@ -50,6 +50,8 @@ class IObject(ABC):
         # where to store the object results should be present, otherwise it's None.
         self.dirpath = None
         self.filepath = None
+        # Objects that represent network conditions, such as Netem, need this parameter set to True in order to have
+        # a different behaviour, since they are not processes
         self.network_condition = None
 
     def __str__(self):
@@ -153,7 +155,6 @@ class Tshark(IObject):
             config['dirpath'],
             config.get('prefix')
         )
-
 
     def make_args(self):
         """
@@ -378,9 +379,21 @@ class Netem(IObject):
             self,
             interface: str,
             rules: typing.List[str]
-            # interface,
-            # rules,
     ):
+        """
+        An object for `tc netem` application.
+
+        Command example:
+        sudo tc qdisc add dev en0  root  netem  delay 100ms loss 10
+
+        Attributes:
+            interface:
+                Interface to apply the network conditions.
+            rules:
+                List of filters that represent the network conditions
+
+        For more information about the tc netem filters visit: http://man7.org/linux/man-pages/man8/tc-netem.8.html
+        """
 
         super().__init__('netem')
         self.filepath = None
@@ -390,14 +403,32 @@ class Netem(IObject):
 
     @classmethod
     def from_config(cls, config: dict):
-
+        """
+        Config Example:
+            config = {
+                'interface': 'en0',             # Interface to apply the network conditions.
+                'rules': [
+                    'delay 100ms',
+                    'loss 10'
+                ]
+            }
+        """
         return cls(
             config['interface'],
             config['rules']
         )
 
     def make_args(self):
+        """
+        Command
+        sudo tc qdisc add dev en0  root  netem  delay 100ms loss 10
 
+
+        transforms to the following list of arguments
+        ['sudo', 'tc', 'qdisc', 'add', 'dev', 'en0', 'root', 'netem', 'delay', '100ms', 'loss', '10']
+
+        to run through `LocalRunner` based on Python `subprocess` module.
+        """
         args = ['sudo', 'tc', 'qdisc', 'add', 'dev', self.interface, 'root', 'netem']
 
         for rule in self.rules:
@@ -406,6 +437,21 @@ class Netem(IObject):
         return args
 
     def make_str(self):
+        """
+        Command
+        sudo tc qdisc add dev en0  root  netem  delay 100ms loss 10
+
+        transforms to the following list of arguments
+        ['ssh', '-tt', '-o', 'BatchMode=yes', '-o', 'ConnectTimeout=10', 'msharabayko@137.116.228.51',
+        'sudo', 'tc', 'qdisc', 'add', 'dev', 'en0', 'root', 'netem', 'delay', '100ms', 'loss', '10']
+
+        when running through `RemoteRunner` based on Python `subprocess` module.
+
+        Here we construct and return only the command string
+        'sudo tc qdisc add dev en0  root  netem  delay 100ms loss 10'
+
+        SSH related arguments are added on top of that in `RemoteRunner` class.
+        """
         args = self.make_args()
         args_str = ' '.join(args)
         return args_str
