@@ -128,7 +128,7 @@ class Process:
             time.sleep(5)
 
         status, returncode = self.status
-        if status == Status.idle:
+        if status == Status.idle and 'netem' not in self.args:
             raise SrtUtilsException(
                 f'Process has not been started: {self.args}, returncode: '
                 f'{returncode}, stdout: {self.process.stdout.readlines()}, '

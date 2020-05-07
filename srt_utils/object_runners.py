@@ -254,53 +254,54 @@ class LocalRunner(IObjectRunner):
         # If an object has filepath defined, it means there should be 
         # an output file produced. However it does not mean that the file
         # was created successfully, that's why we check whether the filepath exists.
-        if not self.obj.filepath.exists():
-            stdout, stderr = self.process.collect_results()
-            raise SrtUtilsException(
-                'There was no output file produced by the object: '
-                f'{self.obj}, nothing to collect. Process stdout: '
-                f'{stdout}. Process stderr: {stderr}'
+        if self.obj.name != 'netem':
+            if not self.obj.filepath.exists():
+                stdout, stderr = self.process.collect_results()
+                raise SrtUtilsException(
+                    'There was no output file produced by the object: '
+                    f'{self.obj}, nothing to collect. Process stdout: '
+                    f'{stdout}. Process stderr: {stderr}'
+                )
+
+            # Create 'local' folder to copy produced by the object file
+            # (inside self.collect_results_path directory)
+            destination_dir = self.collect_results_path / 'local'
+            logger.info(
+                'Creating a local directory for copying object results: '
+                f'{destination_dir}'
             )
+            created = create_local_directory(destination_dir)
+            # if not created:
+            #     logger.info(
+            #         'Directory already exists, no need to create: '
+            #         f'{destination_dir}'
+            #     )
 
-        # Create 'local' folder to copy produced by the object file 
-        # (inside self.collect_results_path directory)
-        destination_dir = self.collect_results_path / 'local'
-        logger.info(
-            'Creating a local directory for copying object results: '
-            f'{destination_dir}'
-        )
-        created = create_local_directory(destination_dir)
-        # if not created:
-        #     logger.info(
-        #         'Directory already exists, no need to create: '
-        #         f'{destination_dir}'
-        #     )
+            # The code below will raise a FileExistsError if destination already exists.
+            # Technically, this copies a file. To perform a move, simply delete source
+            # after the copy is done. Make sure no exception was raised though.
 
-        # The code below will raise a FileExistsError if destination already exists. 
-        # Technically, this copies a file. To perform a move, simply delete source 
-        # after the copy is done. Make sure no exception was raised though.
+            # In case we have several tasks which is runned locally by
+            # LocalRunner runner and in case the tasks have the same names
+            # for the output files, the result might be overwritten.
+            # That's why we do not delete destination file before, instead
+            # we catch FileExistsError exception. That's why it is necessary
+            # to make sure that the file names for different tasks are unique.
+            logger.info(f'Copying object results into: {destination_dir}')
 
-        # In case we have several tasks which is runned locally by 
-        # LocalRunner runner and in case the tasks have the same names 
-        # for the output files, the result might be overwritten. 
-        # That's why we do not delete destination file before, instead
-        # we catch FileExistsError exception. That's why it is necessary 
-        # to make sure that the file names for different tasks are unique.
-        logger.info(f'Copying object results into: {destination_dir}')
+            filename = self.obj.filepath.name
+            source = self.obj.filepath
+            destination = destination_dir / filename
 
-        filename = self.obj.filepath.name
-        source = self.obj.filepath
-        destination = destination_dir / filename
-
-        try:
-            with destination.open(mode='xb') as fid:
-                fid.write(source.read_bytes())
-        except FileExistsError:
-            raise SrtUtilsException(
-                'The destination file already exists, there might be a '
-                f'file created by the other object: {destination}. File '
-                f'with object results was not copied: {self.obj.filepath}'
-            )
+            try:
+                with destination.open(mode='xb') as fid:
+                    fid.write(source.read_bytes())
+            except FileExistsError:
+                raise SrtUtilsException(
+                    'The destination file already exists, there might be a '
+                    f'file created by the other object: {destination}. File '
+                    f'with object results was not copied: {self.obj.filepath}'
+                )
 
         # TODO: (?) Delete source file, might be an option, but not necessary at the start
 

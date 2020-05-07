@@ -376,3 +376,49 @@ class SrtXtransmit(IObject):
         args = [f'"{arg}"' if arg.startswith('srt://') else arg for arg in self.make_args()]
         args_str = ' '.join(args)
         return args_str
+
+
+class Netem(IObject):
+
+    def __init__(
+            self,
+            # interface: str,
+            # rules: typing.List[str]
+            interface,
+            rules,
+    ):
+
+        super().__init__('netem')
+        self.filepath = None
+        self.interface = interface
+        self.rules = rules
+        self.network_condition = True
+
+    @classmethod
+    def from_config(cls, config: dict):
+
+        return cls(
+            config['interface'],
+            config['rules']
+        )
+
+    def make_args(self):
+
+        return [
+            'sudo',
+            'tc',
+            'qdisc',
+            'add',
+            'dev',
+            self.interface,
+            'root',
+            'netem',
+            # ' '.join(self.rules)
+            'delay',
+            '200ms',
+        ]
+
+    def make_str(self):
+        args = self.make_args()
+        args_str = f'{args[0]} {args[1]} root netem {args[2]}'
+        return args_str

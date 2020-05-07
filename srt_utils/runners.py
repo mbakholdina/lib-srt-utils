@@ -25,6 +25,8 @@ class SimpleFactory:
             obj = objects.Tshark.from_config(obj_config)
         elif obj_type == 'srt-xtransmit':
             obj = objects.SrtXtransmit.from_config(obj_config)
+        elif obj_type == 'netem':
+            obj = objects.Netem.from_config(obj_config)
         else:
             print('No matching object found')
 
