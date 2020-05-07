@@ -51,7 +51,7 @@ An experiment config is a `.json` file consisting of the following fields:
 
 The task represents one step of a single experiment and contains both the information regarding the object to run and the way to run this object (object runner) as well as additional information like the sleep after start/stop time, stop order if defined, etc. The task config consists of the following fields:
 
-- `obj_type`: The object to run, currently `tshark` and `srt-xtransmit` objects are supported,
+- `obj_type`: The object to run, currently `tshark`, `srt-xtransmit` and `netem` objects are supported,
 - `obj_config`: The object config which helps to build the command line for subprocess,
 - `runner_type`: The object runner to use, currently `local-runner` and `remote-runner` runners are supported, 
 - `runner_config`: The object runner config which is empty `{}` for the `local-runner` and consists of `username` and `host` in case of `remote-runner`,
@@ -139,6 +139,23 @@ The task represents one step of a single experiment and contains both the inform
 
 `statsfreq`: Frequency of SRT statistics collection, in ms, optional.
 
+### tc-netem
+
+```
+{
+  "obj_type": "netem",
+  "obj_config": {
+    "interface": "en0",
+    "rules": [
+      "delay 100ms",
+      "loss 10"
+    ]
+}
+```
+`interface`: interface where network conditions will be applied.
+`rules`: list of rules that will apply to the previous interface. For more information, visit [tc-netem docs](http://man7.org/linux/man-pages/man8/tc-netem.8.html)
+
+
 ## Supported Object Runners and Their Configs
 
 ### local-runner
@@ -189,6 +206,7 @@ Note:  `--duration` option of the `srt-xtransmit` application is used to control
 | [lore_xtransmit_live](#lore_xtransmit_live)                  | Local-remote setup, `srt-xtransmit` application is used for transmission, live mode. |
 | [lore_xtransmit_live_duration](#lore_xtransmit_live_duration) | Local-remote setup, `srt-xtransmit` application is used for transmission, live mode, `--duration` option of `srt-xtransmit` is used to control the time of data transmission. |
 | [rere_xtransmit_live_duration](#rere_xtransmit_live_duration) | Remote-remote setup, `set-xtransmit` application is used for transmission, live mode, `--duration` option of `srt-xtransmit` is used to control the time of data transmission. |
+| [lore_xtransmit_live_network_conditions](#lore_xtransmit_live_network_conditions) | Loca-remote setup, `set-xtransmit` application is used for transmission, live mode, `--duration` option of `srt-xtransmit` is used to control the time of data transmission. `tc-netem` is used to apply network conditions |
 | TODO: lore_xtransmit_file_duration                           |                                                              |
 | TODO: rere_xtransmit_file_duration                           |                                                              |
 
@@ -239,5 +257,24 @@ ssh -tt -o BatchMode=yes -o ConnectTimeout=10 msharabayko@40.69.89.21 'tshark -i
 ssh -tt -o BatchMode=yes -o ConnectTimeout=10 msharabayko@40.69.89.21 '/home/msharabayko/projects/srt/srt-xtransmit/_build/bin/srt-xtransmit receive "srt://:4200?transtype=live&rcvbuf=1000000000&sndbuf=1000000000" --msgsize 1316 --statsfile _results/srt-xtransmit-stats-rcv.csv --statsfreq 100'
 
 # Task 4
+ssh -tt -o BatchMode=yes -o ConnectTimeout=10 msharabayko@23.96.93.54 '/home/msharabayko/projects/srt/srt-xtransmit/_build/bin/srt-xtransmit generate "srt://40.69.89.21:4200?transtype=live&rcvbuf=1000000000&sndbuf=1000000000" --msgsize 1316 --sendrate 15Mbps --duration 30 --statsfile _results/srt-xtransmit-stats-snd.csv --statsfreq 100'
+```
+
+#### lore_xtransmit_live_network_conditions
+
+```
+# Task 1
+ssh -tt -o BatchMode=yes -o ConnectTimeout=10 msharabayko@23.96.93.54 'tshark -i eth0 -f "udp port 4200" -s 1500 -w _results/tshark-trace-file.pcapng'
+
+# Task 2
+ssh -tt -o BatchMode=yes -o ConnectTimeout=10 msharabayko@40.69.89.21 'tshark -i eth0 -f "udp port 4200" -s 1500 -w _results/tshark-trace-file.pcapng'
+
+# Task 3
+sudo tc qdisc add dev en0  root  netem  delay 100ms
+
+# Task 4
+ssh -tt -o BatchMode=yes -o ConnectTimeout=10 msharabayko@40.69.89.21 '/home/msharabayko/projects/srt/srt-xtransmit/_build/bin/srt-xtransmit receive "srt://:4200?transtype=live&rcvbuf=1000000000&sndbuf=1000000000" --msgsize 1316 --statsfile _results/srt-xtransmit-stats-rcv.csv --statsfreq 100'
+
+# Task 5
 ssh -tt -o BatchMode=yes -o ConnectTimeout=10 msharabayko@23.96.93.54 '/home/msharabayko/projects/srt/srt-xtransmit/_build/bin/srt-xtransmit generate "srt://40.69.89.21:4200?transtype=live&rcvbuf=1000000000&sndbuf=1000000000" --msgsize 1316 --sendrate 15Mbps --duration 30 --statsfile _results/srt-xtransmit-stats-snd.csv --statsfreq 100'
 ```
