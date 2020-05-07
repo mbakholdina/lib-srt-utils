@@ -70,7 +70,7 @@ def before_collect_results_checks(
 
     # If an object has filepath equal to None, it means there should be
     # no output file produced
-    if obj.filepath == None:
+    if obj.filepath:
         logger.info('There was no output file expected, nothing to collect')
         return
 
@@ -104,7 +104,6 @@ class IObjectRunner(ABC):
         """
         pass
 
-
     @classmethod
     @abstractmethod
     def from_config(cls, obj: IObject, config: dict):
@@ -121,7 +120,6 @@ class IObjectRunner(ABC):
         """
         pass
 
-
     @abstractmethod
     def start(self):
         """
@@ -132,7 +130,6 @@ class IObjectRunner(ABC):
         """
         pass
 
-
     @abstractmethod
     def stop(self):
         """
@@ -142,7 +139,6 @@ class IObjectRunner(ABC):
             SrtUtilsException
         """
         pass
-
 
     @abstractmethod
     def collect_results(self):
@@ -178,12 +174,10 @@ class LocalRunner(IObjectRunner):
         self.args = self.obj.make_args()
         self.process = Process(self.args)
 
-
     @property
     def status(self):
         status, _ = self.process.status
         return status
-
 
     @staticmethod
     def _create_directory(dirpath: pathlib.Path):
@@ -207,7 +201,6 @@ class LocalRunner(IObjectRunner):
         #         f'create: {dirpath}'
         #     )
 
-
     @classmethod
     def from_config(cls, obj: IObject, config: dict={}):
         """
@@ -221,21 +214,18 @@ class LocalRunner(IObjectRunner):
 
         return cls(obj)
 
-
     def start(self):
         logger.info(f'Starting object on-premises: {self.obj}')
         logger.info(f'Arguments for LocalRunner: {self.obj.make_args()}')
 
-        if self.obj.dirpath != None:
+        if self.obj.dirpath:
             self._create_directory(self.obj.dirpath)
 
         self.process.start()
 
-
     def stop(self):
         logger.info(f'Stopping object on-premises: {self.obj}, {self.process}')
         self.process.stop()
-
 
     def collect_results(self):
         """
@@ -254,7 +244,7 @@ class LocalRunner(IObjectRunner):
         # If an object has filepath defined, it means there should be 
         # an output file produced. However it does not mean that the file
         # was created successfully, that's why we check whether the filepath exists.
-        if self.obj.name != 'netem':
+        if not self.obj.network_condition:
             if not self.obj.filepath.exists():
                 stdout, stderr = self.process.collect_results()
                 raise SrtUtilsException(
@@ -342,12 +332,10 @@ class RemoteRunner(IObjectRunner):
 
         self.process = Process(self.args, True)
 
-
     @property
     def status(self):
         status, _ = self.process.status
         return status
-
 
     @staticmethod
     def _create_directory(
@@ -401,7 +389,6 @@ class RemoteRunner(IObjectRunner):
         if result.exited != 0:
             raise SrtUtilsException(f'Directory has not been created: {dirpath}')
 
-
     @classmethod
     def from_config(cls, obj: IObject, config: dict):
         """
@@ -422,12 +409,11 @@ class RemoteRunner(IObjectRunner):
 
         return cls(obj, config['username'], config['host'])
 
-
     def start(self):
         logger.info(f'Starting object remotely via SSH: {self.obj}')
         logger.info(f'Arguments for RemoteRunner: {self.args}')
 
-        if self.obj.dirpath != None:
+        if self.obj.dirpath:
             self._create_directory(
                 self.obj.dirpath,
                 self.username,
@@ -436,11 +422,9 @@ class RemoteRunner(IObjectRunner):
 
         self.process.start()
 
-
     def stop(self):
         logger.info(f'Stopping object remotely via SSH: {self.obj}, {self.process}')
         self.process.stop()
-
 
     def collect_results(self):
         """

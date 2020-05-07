@@ -50,11 +50,10 @@ class IObject(ABC):
         # where to store the object results should be present, otherwise it's None.
         self.dirpath = None
         self.filepath = None
-
+        self.network_condition = None
 
     def __str__(self):
         return f'{self.name}'
-
 
     @classmethod
     @abstractmethod
@@ -70,7 +69,6 @@ class IObject(ABC):
         """
         pass
 
-
     @abstractmethod
     def make_args(self):
         """
@@ -79,7 +77,6 @@ class IObject(ABC):
         implemenations.
         """
         pass
-
 
     @abstractmethod
     def make_str(self):
@@ -137,7 +134,6 @@ class Tshark(IObject):
         self.filepath = self.dirpath / filename
         self.network_condition = False
 
-
     @classmethod
     def from_config(cls, config: dict):
         """ 
@@ -176,7 +172,6 @@ class Tshark(IObject):
             '-s', '1500', 
             '-w', str(self.filepath)
         ]
-
 
     def make_str(self):
         """
@@ -270,7 +265,6 @@ class SrtXtransmit(IObject):
             self.dirpath = pathlib.Path(statsdir)
             self.filepath = self.dirpath / filename
 
-
     @classmethod
     def from_config(cls, config: dict):
         """
@@ -308,7 +302,6 @@ class SrtXtransmit(IObject):
             config.get('statsfreq'),
             config.get('prefix')
         )
-
 
     def make_args(self):
         """
@@ -350,7 +343,6 @@ class SrtXtransmit(IObject):
                 args += ['--statsfreq', self.statsfreq]
 
         return args
-
 
     def make_str(self):
         """
@@ -408,10 +400,9 @@ class Netem(IObject):
 
         args = ['sudo', 'tc', 'qdisc', 'add', 'dev', self.interface, 'root', 'netem']
 
-        print(args)
         for rule in self.rules:
             args += rule.split(' ')
-        print(args)
+
         return args
 
     def make_str(self):
