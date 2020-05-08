@@ -155,6 +155,10 @@ The task represents one step of a single experiment and contains both the inform
 `interface`: interface where network conditions will be applied.
 `rules`: list of rules that will apply to the previous interface. For more information, visit [tc-netem docs](http://man7.org/linux/man-pages/man8/tc-netem.8.html)
 
+If this task was used, after the experiment `sudo tc qdisc del dev [interface] root` must be run in the machine where
+the network conditions were added in order to clean the rules applied.
+
+If running on remote-runner, make sure to remove the password for sudo.
 
 ## Supported Object Runners and Their Configs
 
