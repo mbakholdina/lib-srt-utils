@@ -18,7 +18,8 @@ logger = logging.getLogger(__name__)
 
 class SimpleFactory:
 
-    def create_object(self, obj_type: str, obj_config: dict) -> objects.IObject:
+    @staticmethod
+    def create_object(obj_type: str, obj_config: dict) -> objects.IObject:
         obj = None
 
         if obj_type == 'tshark':
@@ -32,7 +33,8 @@ class SimpleFactory:
 
         return obj
 
-    def create_runner(self, obj, runner_type: str, runner_config: dict) -> object_runners.IObjectRunner:
+    @staticmethod
+    def create_runner(obj, runner_type: str, runner_config: dict) -> object_runners.IObjectRunner:
         runner = None
 
         if runner_type == 'local-runner':
@@ -98,7 +100,6 @@ class Task:
         self.sleep_after_stop = config.get('sleep_after_stop')
         self.stop_order = config.get('stop_order')
 
-
     def __str__(self):
         return f'task-{self.key}'
 
@@ -150,7 +151,6 @@ class SingleExperimentRunner:
 
         # self.log = ContextualLoggerAdapter(LOGGER, {'context': type(self).__name__})
 
-
     @staticmethod
     def _create_directory(dirpath: pathlib.Path):
         """
@@ -174,7 +174,6 @@ class SingleExperimentRunner:
                 'will not be deleted'
             )
 
-
     @classmethod
     def from_config(cls, config: dict):
         """
@@ -191,7 +190,6 @@ class SingleExperimentRunner:
             config['stop_after'],
             config['tasks'].items()
         )
-
 
     def start(self):
         """
@@ -219,7 +217,6 @@ class SingleExperimentRunner:
                 time.sleep(sleep_after_start)
 
         self.is_started = True
-
 
     def stop(self):
         """
@@ -267,7 +264,6 @@ class SingleExperimentRunner:
 
         self.is_stopped = True
 
-
     def collect_results(self):
         """
         Collect experiment results.
@@ -300,7 +296,6 @@ class SingleExperimentRunner:
                     f'Failed to collect task results: {task}. Reason: {error}'
                 )
                 continue
-
 
     def clean_up(self):
         """

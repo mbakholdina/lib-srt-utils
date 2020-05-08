@@ -36,11 +36,10 @@ class Process:
         self.id = None
         self.is_started = False
         self.is_stopped = False
-
+        self.network_condition = 'netem' in self.args or 'netem' in self.args[-1]
 
     def __str__(self):
         return f'process id {self.id}'
-
 
     @property
     def status(self):
@@ -69,7 +68,6 @@ class Process:
         returncode = self.process.poll()
         status = Status.running if returncode is None else Status.idle
         return (status, returncode)
-
 
     def start(self):
         """
@@ -128,7 +126,7 @@ class Process:
             time.sleep(5)
 
         status, returncode = self.status
-        if status == Status.idle and 'netem' not in self.args:
+        if status == Status.idle and not self.network_condition:
             raise SrtUtilsException(
                 f'Process has not been started: {self.args}, returncode: '
                 f'{returncode}, stdout: {self.process.stdout.readlines()}, '
@@ -136,7 +134,6 @@ class Process:
             )
 
         self.id = self.process.pid
-
 
     def _terminate(self):
         """
@@ -170,7 +167,6 @@ class Process:
 
         raise SrtUtilsException(f'Process has not been terminated: {self.id}')
 
-
     def _kill(self):
         """
         Kill process.
@@ -198,7 +194,6 @@ class Process:
         status, _ = self.status
         if status == Status.running:
             raise SrtUtilsException(f'Process has not been killed: {self.id}')
-
 
     def stop(self):
         """
@@ -255,7 +250,6 @@ class Process:
                 )
 
         self.is_stopped = True
-
 
     def collect_results(self):
         """
