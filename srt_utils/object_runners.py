@@ -220,7 +220,7 @@ class LocalRunner(IObjectRunner):
         logger.info(f'Starting object on-premises: {self.obj}')
         logger.info(f'Arguments for LocalRunner: {self.obj.make_args()}')
 
-        if self.obj.dirpath != None:
+        if self.obj.dirpath is not None:
             self._create_directory(self.obj.dirpath)
 
         self.process.start()
@@ -426,7 +426,7 @@ class RemoteRunner(IObjectRunner):
         logger.info(f'Starting object remotely via SSH: {self.obj}')
         logger.info(f'Arguments for RemoteRunner: {self.args}')
 
-        if self.obj.dirpath != None:
+        if self.obj.dirpath is not None:
             self._create_directory(
                 self.obj.dirpath,
                 self.username,
