@@ -68,12 +68,6 @@ def before_collect_results_checks(
             f'{collect_results_path}. Can not collect results'
         )
 
-    # If an object has filepath equal to None, it means there should be
-    # no output file produced
-    if obj.filepath == None:
-        logger.info('There was no output file expected, nothing to collect')
-        return
-
 
 class IObjectRunner(ABC):
     """
@@ -250,6 +244,12 @@ class LocalRunner(IObjectRunner):
             self.process,
             self.collect_results_path
         )
+
+        # If an object has filepath equal to None, it means there should be
+        # no output file produced
+        if self.obj.filepath is None:
+            logger.info('There was no output file expected, nothing to collect')
+            return
 
         # If an object has filepath defined, it means there should be 
         # an output file produced. However it does not mean that the file
@@ -454,6 +454,12 @@ class RemoteRunner(IObjectRunner):
             self.process,
             self.collect_results_path
         )
+
+        # If an object has filepath equal to None, it means there should be
+        # no output file produced
+        if self.obj.filepath is None:
+            logger.info('There was no output file expected, nothing to collect')
+            return
 
         # If an object has filepath defined, it means there should be 
         # an output file produced. However it does not mean that the file
