@@ -1,21 +1,41 @@
-import shutil, os
-# files = ['file1.txt', 'file2.txt', 'file3.txt']
-# for f in files:
-#     shutil.copy(f, 'dest_folder')
+"""
+Script-helper designed to move experiment results from subfolders to a root
+folder corresponding to a particular experiment,
+e.g., from subfolders haivision@10.129.128.51 and haivision@10.129.128.52
 
+_rtt20_loss0_sendrate10_latency10/haivision@10.129.128.51/2-srt-xtransmit-stats-snd.csv
+_rtt20_loss0_sendrate10_latency10/haivision@10.129.128.52/1-srt-xtransmit-stats-rcv.csv
 
-import click
+to a root folder _rtt20_loss0_sendrate10_latency10
+
+_rtt20_loss0_sendrate10_latency10/2-srt-xtransmit-stats-snd.csv
+_rtt20_loss0_sendrate10_latency10/1-srt-xtransmit-stats-rcv.csv
+
+This is done for all the experiment folders under path specified
+
+_send_buffer_datasets_12.06.20/_rtt20_loss0_sendrate10_latency10
+_send_buffer_datasets_12.06.20/_rtt20_loss0_sendrate10_latency20
+...
+
+where path is _send_buffer_datasets_12.06.20/
+"""
+import os
+import shutil
 import sys
 
+# import click
+
+
 def main():
-    path = 'd:\\tests\\srt\\Periodic-NAK-DataSet-1\\periodic_nak_off\\'
+    # TODO: Command line
+    path = '/Users/msharabayko/projects/srt/lib-srt-utils/_send_buffer_datasets_12.06.20/'
+    subfolders = ['haivision@10.129.128.51', 'haivision@10.129.128.52']
 
     for src_dir, dirs, files in os.walk(path):
         print(src_dir)
         print(dirs)
         print(files)
 
-        subfolders = ['msharabayko@10.129.10.165', 'local']
         for subfolder in subfolders:
             if src_dir.find(subfolder) == -1:    
                 continue
@@ -42,5 +62,6 @@ def main():
                 if os.path.exists(src_dir):
                     os.rmdir(src_dir)
 
+
 if __name__ == '__main__':
-	main()
+    main()
