@@ -165,7 +165,7 @@ def plot_buffer_fullness(db, sendrate, loss, rtt, algs):
 #     return db
 
 
-def load_datasets():
+def load_datasets_periodic_nak():
     # root_path = 'd:\\tests\\srt\\Periodic-NAK-DataSet-1\\'
     root_path = '/Users/msharabayko/projects/srt/lib-srt-utils/_periodic_nak_datasets_27.02.20/'
 
@@ -211,6 +211,8 @@ def load_datasets():
         row = pd.DataFrame([[loss, rtt, rate, algo, latency, rex, drop, rcvbuf]], columns = columns)
         db = db.append(row)
 
+    db.sort_values(['lossratio', 'rtt', 'sendrate', 'latency'], inplace=True)
+    db.reset_index(drop=True, inplace=True)
     
     # periodic_nak_loss8 = {
     #     'name': 'Periodic NAK',
@@ -292,12 +294,14 @@ def load_datasets():
     algs = [algo]
     #plot_rexmit_drops(db, 7, 8, 54, algs)
 
+    # def plot_buffer_fullness(db, sendrate, loss, rtt, algs)
     plot_buffer_fullness(db, 7, 8, 54, algs)
+    plot_rexmit_drops(db, 7, 8, 54, algs)
 
 
 def main():
     #create_dataframe()
-    load_datasets()
+    load_datasets_periodic_nak()
 
 if __name__ == '__main__':
     main()
