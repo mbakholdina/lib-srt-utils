@@ -102,7 +102,7 @@ def calc_rcv_buf_bytes(rtt_ms, bps, latency_ms):
 
 
 def plot_buffer_fullness(db, sendrate, loss, rtt, algs):
-    db['latenxyxrtt'] = db.latency / db.rtt
+    db['latencyxrtt'] = db.latency / db.rtt
 
     f, (ax1) = plt.subplots(1, 1, sharex=True)
     f.canvas.set_window_title('Test')
@@ -112,18 +112,21 @@ def plot_buffer_fullness(db, sendrate, loss, rtt, algs):
     for alg in algs:
         indexer_alg = db.algo == alg
         indexer = indexer_alg & (db.lossratio == loss) & (db.sendrate == sendrate) & (db.rtt == rtt)
+
         if db[indexer].empty:
             print(f"ERROR! No data for {alg}.")
             continue
 
-        db[indexer].plot(x='latenxyxrtt', y='rcvbuffill',   kind="line", linestyle='-', marker='o', ax=ax1)
+        db[indexer].plot(x='latencyxrtt', y='rcvbuffill', kind="line", linestyle='-', marker='o', ax=ax1)
         if expected.empty:
-            expected = db[indexer][['latenxyxrtt', 'rcvbuffill']].copy()
+            expected = db[indexer][['latency', 'latencyxrtt', 'rcvbuffill']].copy()
 
+    # TODO: This can be improved
     for _, row in expected.iterrows():
-        latency_ms = row['latenxyxrtt'] * rtt
+        latency_ms = row['latency']
         row['rcvbuffill'] = calc_rcv_buf_bytes(rtt, sendrate * 1_000_000, latency_ms)
-    expected.plot(x='latenxyxrtt', y='rcvbuffill',   kind="line", linestyle='--', marker='o', ax=ax1)
+
+    expected.plot(x='latencyxrtt', y='rcvbuffill', kind="line", linestyle='--', marker='o', ax=ax1)
 
     f.suptitle('Loss {}%, RTT {}ms, Sendrate {} Mbps'.format(loss, rtt, sendrate))
 
@@ -208,8 +211,6 @@ def load_datasets():
         row = pd.DataFrame([[loss, rtt, rate, algo, latency, rex, drop, rcvbuf]], columns = columns)
         db = db.append(row)
 
-    db = db.sort_values(['lossratio', 'rtt', 'sendrate', 'latency'])
-    print(db)
     
     # periodic_nak_loss8 = {
     #     'name': 'Periodic NAK',
