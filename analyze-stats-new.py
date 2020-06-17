@@ -3,16 +3,19 @@ import re
 
 import matplotlib.pyplot as plt
 import pandas as pd
+import streamlit as st
 
 
 ######### Loading datasets #########
 def load_csv_stats(rcvcsv, sndcsv):
+    print('load csv stats')
     rcv = pd.read_csv(rcvcsv, sep=",", skipinitialspace=True)
     snd = pd.read_csv(sndcsv, sep=",", skipinitialspace=True)
     return rcv, snd
 
 
 def extract_features(rcv, snd):
+    print('extract features')
     sent = snd['pktSent'].sum()
     rexmits = snd['pktRetrans'].sum()
     droped = rcv['pktRcvDrop'].sum()
@@ -24,8 +27,9 @@ def extract_features(rcv, snd):
     return (rexmits / sent) * 100, (droped / sent) * 100, max_fullness
 
 
-def load_datasets():
-    root_path = '/Users/msharabayko/projects/srt/lib-srt-utils/_send_buffer_datasets_12.06.20/'
+# @st.cache
+def load_datasets(root_path):
+    print('load datasets')
 
     # TODO: Load datasets for several folders, 1 folder corresponds to 1 algo
     # TODO: Define a set of path + description (algo as a start)
@@ -115,18 +119,27 @@ def plot_rcv_buffer_fullness(df, rtt, loss, sendrate, algs):
     ax1.set_ylabel("Bytes")
     ax1.set_xlabel("Latency (times RTT)")
 
-    plt.show()
+    # plt.show()
+    st.pyplot()
 
 
 def main():
-    #create_dataframe()
-    df = load_datasets()
+    root_path_30secs = '/Users/msharabayko/projects/srt/lib-srt-utils/_send_buffer_datasets_12.06.20_30secs/'
 
-    rtt = 20
-    loss = 4
-    sendrate = 10
+    st.title('My first app')
+
+    df = load_datasets(root_path_30secs)
+    st.subheader('Result dataframe, 30 secs datasets')
+    st.write(df)
+
+    st.subheader('Receiver buffer fullness, 30 secs datasets')
     algs = ['Periodic NAK']
-    plot_rcv_buffer_fullness(df, rtt, loss, sendrate, algs)
+    # TODO: There is a bug when plotting multiple plots
+    # https://github.com/streamlit/streamlit/issues/1440
+    # Error message: MediaFileManager: Missing file 1c836691489ae0c9bb858e79fd64a7767687f879e06cad7a4eed5cea
+    # plot_rcv_buffer_fullness(df, 20, 0, 10, algs)
+    # plot_rcv_buffer_fullness(df, 20, 4, 10, algs)
+    # plot_rcv_buffer_fullness(df, 20, 8, 10, algs)
 
 
 if __name__ == '__main__':
