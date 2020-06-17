@@ -16,15 +16,37 @@ def load_csv_stats(rcvcsv, sndcsv):
 
 def extract_features(rcv, snd):
     print('extract features')
+
     sent = snd['pktSent'].sum()
     rexmits = snd['pktRetrans'].sum()
-    droped = rcv['pktRcvDrop'].sum()
+    drops = rcv['pktRcvDrop'].sum()
+
+    rexmits_ratio = rexmits * 100 / sent
+    drops_ratio = drops * 100 / sent
 
     rcv_buffer_size = rcv['byteAvailRcvBuf'].iloc[0]
-    fullness = rcv_buffer_size - rcv['byteAvailRcvBuf']
-    max_fullness = fullness.max()
+    rcv_buffer_fullness = rcv_buffer_size - rcv['byteAvailRcvBuf']
+    rcv_buffer_max_fullness = rcv_buffer_fullness.max()
 
-    return (rexmits / sent) * 100, (droped / sent) * 100, max_fullness
+    snd_buffer_size = snd['byteAvailSndBuf'].iloc[0]
+    snd_buffer_fullness = snd_buffer_size - snd['byteAvailSndBuf']
+    snd_buffer_max_fullness = snd_buffer_fullness.max()
+
+    # Drop the first row where msSndBuf=0
+    snd_buffer_timespan = snd['msSndBuf'].iloc[1:]
+    snd_buffer_min_timespan = snd_buffer_timespan.min()
+    snd_buffer_max_timespan = snd_buffer_timespan.max()
+    snd_buffer_mean_timespan = snd_buffer_timespan.mean()
+
+    return {
+        'rexmits_ratio': rexmits_ratio,
+        'drops_ratio': drops_ratio,
+        'snd_buffer_max_fullness': snd_buffer_max_fullness,
+        'rcv_buffer_max_fullness': rcv_buffer_max_fullness,
+        'snd_buffer_min_timespan': snd_buffer_min_timespan,
+        'snd_buffer_max_timespan': snd_buffer_max_timespan,
+        'snd_buffer_mean_timespan': snd_buffer_mean_timespan,
+    }
 
 
 # @st.cache
@@ -44,7 +66,20 @@ def load_datasets(root_path):
     # Find all directories with experiments results in algo_dir
     expers_dirs = [f for f in algo_dir.iterdir() if f.is_dir()]
 
-    cols = ['rtt', 'loss', 'sendrate', 'latency', 'algo', 'rexmits', 'drops', 'rcvbuffill']
+    cols = [
+        'rtt',
+        'loss',
+        'sendrate',
+        'latency',
+        'algo',
+        'rexmits_ratio',
+        'drops_ratio',
+        'snd_buffer_max_fullness',
+        'rcv_buffer_max_fullness',
+        'snd_buffer_min_timespan',
+        'snd_buffer_max_timespan',
+        'snd_buffer_mean_timespan',
+    ]
     df = pd.DataFrame(columns=cols)
 
     for dirpath in expers_dirs:
@@ -68,14 +103,32 @@ def load_datasets(root_path):
         latency = params[3]
         
         rcv, snd = load_csv_stats(rcvcsv_path, sndcsv_path)
-        rex, drop, rcvbuf = extract_features(rcv, snd)
-        row = pd.DataFrame([[rtt, loss, sendrate, latency, algo, rex, drop, rcvbuf]], columns=cols)
+        features = extract_features(rcv, snd)
+
+        row = pd.DataFrame(
+            [
+                [
+                    rtt,
+                    loss,
+                    sendrate,
+                    latency,
+                    algo,
+                    features['rexmits_ratio'],
+                    features['drops_ratio'],
+                    features['snd_buffer_max_fullness'],
+                    features['rcv_buffer_max_fullness'],
+                    features['snd_buffer_min_timespan'],
+                    features['snd_buffer_max_timespan'],
+                    features['snd_buffer_mean_timespan'],
+                ]
+            ],
+            columns=cols
+        )
         df = df.append(row)
 
     df.sort_values(['rtt', 'loss', 'sendrate', 'latency'], inplace=True)
     df.reset_index(drop=True, inplace=True)
 
-    print(df)
     return df
 
 
@@ -123,8 +176,60 @@ def plot_rcv_buffer_fullness(df, rtt, loss, sendrate, algs):
     st.pyplot()
 
 
+def plot_snd_buffer_timespan(df):
+    # TODO: Loop through algos
+
+    # TODO: Move to load_datasets
+    df['latencyxrtt'] = df.latency / df.rtt
+
+    f, (ax1) = plt.subplots(1, 1, sharex=True)
+    f.canvas.set_window_title('Test')
+    
+
+    df.plot(x='latencyxrtt', y='snd_buffer_max_timespan', kind="line", linestyle='-', marker='o', ax=ax1)
+    # df.plot(x='latencyxrtt', y='snd_buffer_min_timespan', kind="line", linestyle='-', marker='o', ax=ax1)
+
+    loss = df.loss.iloc[0]
+    rtt = df.rtt.iloc[0]
+    sendrate = df.sendrate.iloc[0]
+    f.suptitle('Loss {}%, RTT {}ms, Sendrate {} Mbps'.format(loss, rtt, sendrate))
+
+    ax1.set_title('Sender buffer timespan')
+    # ax1.legend(algs + ['Prediction'])
+    ax1.set_ylabel("Milliseconds (ms)")
+    ax1.set_xlabel("Latency (times RTT)")
+
+    # TODO: Prediction
+
+    plt.show()
+
+
+def confidence_interval(series):
+    return (series.quantile(0.025), series.quantile(0.975))
+
+
 def main():
     root_path_30secs = '/Users/msharabayko/projects/srt/lib-srt-utils/_send_buffer_datasets_12.06.20_30secs/'
+
+    ### For debugging ###
+    df = load_datasets(root_path_30secs)
+    print(df)
+
+    tmp_df = df.groupby(['rtt', 'loss', 'sendrate', 'algo'])[['snd_buffer_min_timespan', 'snd_buffer_max_timespan', 'snd_buffer_mean_timespan']].agg(confidence_interval)
+    print(tmp_df)
+
+    # TODO: Remove from here aggregation by algos
+    plot_dfs = df.groupby(['rtt', 'loss', 'sendrate', 'algo'])
+    for group_name, group in plot_dfs:
+        print(group_name)
+        print(group)
+        plot_snd_buffer_timespan(group)
+
+
+
+    return
+
+    ### End of debugging ###
 
     st.title('My first app')
 
