@@ -8,14 +8,14 @@ import streamlit as st
 
 ######### Loading datasets #########
 def load_csv_stats(rcvcsv, sndcsv):
-    print('load csv stats')
+    # print('load csv stats')
     rcv = pd.read_csv(rcvcsv, sep=",", skipinitialspace=True)
     snd = pd.read_csv(sndcsv, sep=",", skipinitialspace=True)
     return rcv, snd
 
 
 def extract_features(rcv, snd):
-    print('extract features')
+    # print('extract features')
 
     sent = snd['pktSent'].sum()
     rexmits = snd['pktRetrans'].sum()
@@ -50,13 +50,16 @@ def extract_features(rcv, snd):
 
 
 # @st.cache
-def load_datasets(root_path):
-    print('load datasets')
+def load_datasets(root_path, algos):
+    # print('load datasets')
 
     # TODO: Load datasets for several folders, 1 folder corresponds to 1 algo
+    assert(len(algos) == 1)
+
     # TODO: Define a set of path + description (algo as a start)
-    algo = 'Periodic NAK'
-    algo_path = 'periodic_nak/'
+    algo, algo_path = algos[0]
+
+    # TODO: Make as a function parameters
     schema = '_rtt{}_loss{}_sendrate{}_latency{}'
     rcvcsv = '1-srt-xtransmit-stats-rcv.csv'
     sndcsv = '2-srt-xtransmit-stats-snd.csv'
@@ -83,7 +86,7 @@ def load_datasets(root_path):
     df = pd.DataFrame(columns=cols)
 
     for dirpath in expers_dirs:
-        print(f'Extracting metrics for : {dirpath}')
+        # print(f'Extracting metrics for : {dirpath}')
         rcvcsv_path = dirpath / rcvcsv
         sndcsv_path = dirpath / sndcsv
 
@@ -126,6 +129,22 @@ def load_datasets(root_path):
         )
         df = df.append(row)
 
+    df['latencyxrtt'] = df.latency / df.rtt
+
+    df = df.astype(
+        {
+            'rtt': 'int32',
+            'loss': 'int32',
+            'sendrate': 'int32',
+            'latency': 'int32',
+            'snd_buffer_max_fullness': 'float64',
+            'rcv_buffer_max_fullness': 'float64',
+            'snd_buffer_min_timespan': 'float64',
+            'snd_buffer_max_timespan': 'float64',
+            'latencyxrtt': 'float64',
+        }
+    )
+
     df.sort_values(['rtt', 'loss', 'sendrate', 'latency'], inplace=True)
     df.reset_index(drop=True, inplace=True)
 
@@ -139,8 +158,6 @@ def calc_rcv_buf_bytes(rtt_ms, bps, latency_ms):
 
 
 def plot_rcv_buffer_fullness(df, rtt, loss, sendrate, algs):
-    df['latencyxrtt'] = df.latency / df.rtt
-
     f, (ax1) = plt.subplots(1, 1, sharex=True)
     f.canvas.set_window_title('Test')
 
@@ -180,13 +197,22 @@ def plot_snd_buffer_timespan(df):
     # TODO: Loop through algos
 
     # TODO: Move to load_datasets
-    df['latencyxrtt'] = df.latency / df.rtt
+    # TODO: Fix SettingWithCopyWarning warning
+    # https://github.com/pandas-dev/pandas/issues/17476
+    df.loc[:, 'latencyxrtt'] = df.latency / df.rtt
+    # Calculating prediction
+    df.loc[:, 'snd_buffer_min_timespan_predict'] = df.rtt
+    df.loc[:, 'snd_buffer_max_timespan_predict'] = df.rtt + 10
 
-    f, (ax1) = plt.subplots(1, 1, sharex=True)
+    f, (ax1) = plt.subplots(1, 1, sharex=True, figsize=(12,6))
     f.canvas.set_window_title('Test')
 
     df.plot(x='latencyxrtt', y='snd_buffer_max_timespan', kind="line", linestyle='-', marker='o', ax=ax1)
     df.plot(x='latencyxrtt', y='snd_buffer_min_timespan', kind="line", linestyle='-', marker='o', ax=ax1)
+    df.plot(x='latencyxrtt', y='snd_buffer_mean_timespan', kind="line", linestyle='-', marker='o', ax=ax1)
+
+    df.plot(x='latencyxrtt', y='snd_buffer_min_timespan_predict', kind="line", linestyle='-', marker='o', color='red', ax=ax1)
+    df.plot(x='latencyxrtt', y='snd_buffer_max_timespan_predict', kind="line", linestyle='-', marker='o', color='red', ax=ax1)
 
     loss = df.loss.iloc[0]
     rtt = df.rtt.iloc[0]
@@ -195,8 +221,8 @@ def plot_snd_buffer_timespan(df):
 
     ax1.set_title('Sender buffer timespan')
     # ax1.legend(algs + ['Prediction'])
-    ax1.set_ylabel("Milliseconds (ms)")
-    ax1.set_xlabel("Latency (times RTT)")
+    ax1.set_ylabel('Milliseconds (ms)')
+    ax1.set_xlabel('Latency (times RTT)')
 
     # TODO: Prediction
 
