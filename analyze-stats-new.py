@@ -184,15 +184,14 @@ def plot_snd_buffer_timespan(df):
 
     f, (ax1) = plt.subplots(1, 1, sharex=True)
     f.canvas.set_window_title('Test')
-    
 
     df.plot(x='latencyxrtt', y='snd_buffer_max_timespan', kind="line", linestyle='-', marker='o', ax=ax1)
-    # df.plot(x='latencyxrtt', y='snd_buffer_min_timespan', kind="line", linestyle='-', marker='o', ax=ax1)
+    df.plot(x='latencyxrtt', y='snd_buffer_min_timespan', kind="line", linestyle='-', marker='o', ax=ax1)
 
     loss = df.loss.iloc[0]
     rtt = df.rtt.iloc[0]
     sendrate = df.sendrate.iloc[0]
-    f.suptitle('Loss {}%, RTT {}ms, Sendrate {} Mbps'.format(loss, rtt, sendrate))
+    f.suptitle(f'RTT {rtt}ms, Loss Ratio {loss}%, Sendrate {sendrate} Mbps')
 
     ax1.set_title('Sender buffer timespan')
     # ax1.legend(algs + ['Prediction'])
