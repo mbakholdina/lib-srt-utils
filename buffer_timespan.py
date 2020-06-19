@@ -3,26 +3,26 @@ import re
 
 import matplotlib.pyplot as plt
 import pandas as pd
-import streamlit as st
 
 
 ######### Loading datasets #########
 def load_csv_stats(rcvcsv, sndcsv):
-    # print('load csv stats')
     rcv = pd.read_csv(rcvcsv, sep=",", skipinitialspace=True)
     snd = pd.read_csv(sndcsv, sep=",", skipinitialspace=True)
     return rcv, snd
 
 
 def extract_features(rcv, snd):
-    # print('extract features')
-
     sent = snd['pktSent'].sum()
-    rexmits = snd['pktRetrans'].sum()
+    loss_reports = snd['pktSndLoss'].sum()
+    lost = rcv['pktRcvLoss'].sum()
+    retransm = snd['pktRetrans'].sum()
     drops = rcv['pktRcvDrop'].sum()
 
-    rexmits_ratio = rexmits * 100 / sent
-    drops_ratio = drops * 100 / sent
+    loss_reports_ratio = loss_reports * 100 / sent
+    retransm_ratio = retransm * 100 / sent
+    loss_ratio = lost * 100 / sent
+    drop_ratio = drops * 100 / sent
 
     rcv_buffer_size = rcv['byteAvailRcvBuf'].iloc[0]
     rcv_buffer_fullness = rcv_buffer_size - rcv['byteAvailRcvBuf']
@@ -39,8 +39,10 @@ def extract_features(rcv, snd):
     snd_buffer_mean_timespan = snd_buffer_timespan.mean()
 
     return {
-        'rexmits_ratio': rexmits_ratio,
-        'drops_ratio': drops_ratio,
+        'loss_reports_ratio': loss_reports_ratio,
+        'retransm_ratio': retransm_ratio,
+        'loss_ratio': loss_ratio,
+        'drop_ratio': drop_ratio,
         'snd_buffer_max_fullness': snd_buffer_max_fullness,
         'rcv_buffer_max_fullness': rcv_buffer_max_fullness,
         'snd_buffer_min_timespan': snd_buffer_min_timespan,
@@ -49,17 +51,12 @@ def extract_features(rcv, snd):
     }
 
 
-# @st.cache
 def load_datasets(root_path, algos):
-    # print('load datasets')
-
     # TODO: Load datasets for several folders, 1 folder corresponds to 1 algo
     assert(len(algos) == 1)
-
-    # TODO: Define a set of path + description (algo as a start)
     algo, algo_path = algos[0]
 
-    # TODO: Make as a function parameters
+    # TODO: Make as function parameters
     schema = '_rtt{}_loss{}_sendrate{}_latency{}'
     rcvcsv = '1-srt-xtransmit-stats-rcv.csv'
     sndcsv = '2-srt-xtransmit-stats-snd.csv'
@@ -75,8 +72,10 @@ def load_datasets(root_path, algos):
         'sendrate',
         'latency',
         'algo',
-        'rexmits_ratio',
-        'drops_ratio',
+        'loss_reports_ratio',
+        'retransm_ratio',
+        'loss_ratio',
+        'drop_ratio',
         'snd_buffer_max_fullness',
         'rcv_buffer_max_fullness',
         'snd_buffer_min_timespan',
@@ -116,8 +115,10 @@ def load_datasets(root_path, algos):
                     sendrate,
                     latency,
                     algo,
-                    features['rexmits_ratio'],
-                    features['drops_ratio'],
+                    features['loss_reports_ratio'],
+                    features['retransm_ratio'],
+                    features['loss_ratio'],
+                    features['drop_ratio'],
                     features['snd_buffer_max_fullness'],
                     features['rcv_buffer_max_fullness'],
                     features['snd_buffer_min_timespan'],
@@ -153,6 +154,7 @@ def load_datasets(root_path, algos):
 
 ######### Analysis #########
 
+# TODO: Move receiver buffer logic to a separate file
 def calc_rcv_buf_bytes(rtt_ms, bps, latency_ms):
     return (latency_ms + rtt_ms / 2) * bps / 1000 / 8
 
@@ -189,42 +191,41 @@ def plot_rcv_buffer_fullness(df, rtt, loss, sendrate, algs):
     ax1.set_ylabel("Bytes")
     ax1.set_xlabel("Latency (times RTT)")
 
-    # plt.show()
-    st.pyplot()
+    plt.show()
 
 
 def plot_snd_buffer_timespan(df):
     # TODO: Loop through algos
 
-    # TODO: Move to load_datasets
-    # TODO: Fix SettingWithCopyWarning warning
-    # https://github.com/pandas-dev/pandas/issues/17476
-    df.loc[:, 'latencyxrtt'] = df.latency / df.rtt
     # Calculating prediction
-    df.loc[:, 'snd_buffer_min_timespan_predict'] = df.rtt
-    df.loc[:, 'snd_buffer_max_timespan_predict'] = df.rtt + 10
+    df['snd_buffer_min_timespan_predict'] = df['rtt']
+    df['snd_buffer_max_timespan_predict'] = df['rtt'] + 10
 
-    f, (ax1) = plt.subplots(1, 1, sharex=True, figsize=(12,6))
-    f.canvas.set_window_title('Test')
+    f, ax = plt.subplots(figsize=(12,6))
+    # f.canvas.set_window_title('Test')
 
-    df.plot(x='latencyxrtt', y='snd_buffer_max_timespan', kind="line", linestyle='-', marker='o', ax=ax1)
-    df.plot(x='latencyxrtt', y='snd_buffer_min_timespan', kind="line", linestyle='-', marker='o', ax=ax1)
-    df.plot(x='latencyxrtt', y='snd_buffer_mean_timespan', kind="line", linestyle='-', marker='o', ax=ax1)
+    df.plot(x='latencyxrtt', y='snd_buffer_max_timespan', kind="line", linestyle='-', marker='o', ax=ax)
+    df.plot(x='latencyxrtt', y='snd_buffer_min_timespan', kind="line", linestyle='-', marker='o', ax=ax)
+    df.plot(x='latencyxrtt', y='snd_buffer_mean_timespan', kind="line", linestyle='-', marker='o', ax=ax)
 
-    df.plot(x='latencyxrtt', y='snd_buffer_min_timespan_predict', kind="line", linestyle='-', marker='o', color='red', ax=ax1)
-    df.plot(x='latencyxrtt', y='snd_buffer_max_timespan_predict', kind="line", linestyle='-', marker='o', color='red', ax=ax1)
+    ax.fill_between(
+        df['latencyxrtt'],
+        df['snd_buffer_min_timespan_predict'],
+        df['snd_buffer_max_timespan_predict'],
+        color='green',
+        alpha=0.3,
+        label='prediction'
+    )
 
     loss = df.loss.iloc[0]
     rtt = df.rtt.iloc[0]
     sendrate = df.sendrate.iloc[0]
     f.suptitle(f'RTT {rtt}ms, Loss Ratio {loss}%, Sendrate {sendrate} Mbps')
 
-    ax1.set_title('Sender buffer timespan')
-    # ax1.legend(algs + ['Prediction'])
-    ax1.set_ylabel('Milliseconds (ms)')
-    ax1.set_xlabel('Latency (times RTT)')
-
-    # TODO: Prediction
+    ax.set_title('Sender buffer timespan')
+    ax.set_ylabel('Milliseconds (ms)')
+    ax.set_xlabel('Latency (times RTT)')
+    ax.legend(loc='upper right')
 
     plt.show()
 
@@ -233,43 +234,53 @@ def confidence_interval(series):
     return (series.quantile(0.025), series.quantile(0.975))
 
 
+def define_percentage(algo_dir: str, starts_with: str, sndcsv: str, rtt):
+    series = pd.Series([])
+
+    algo_dir = pathlib.Path(algo_dir)
+    # Find all directories with experiments results in algo_dir
+    expers_dirs = [f for f in algo_dir.iterdir() if f.is_dir()]
+
+    for dirpath in expers_dirs:
+        dirname = dirpath.relative_to(algo_dir)
+
+        if not str(dirname).startswith(starts_with):
+            continue
+
+        sndcsv_path = dirpath / sndcsv
+
+        single_df = pd.read_csv(sndcsv_path, sep=",", skipinitialspace=True)
+        to_append = single_df['msSndBuf']
+        # Drop the first row where msSndBuf=0
+        to_append = to_append.iloc[1:]
+        series = series.append(to_append)
+
+    perc_total = round((1 - series.between(rtt, rtt + 10).sum() / series.count()) * 100, 2)
+    perc_below = round(series.between(series.min(), rtt).sum() * 100 / series.count(), 2)
+    perc_higher = perc_total - perc_below
+
+    # Plot histogram
+    f, ax = plt.subplots()
+    f.suptitle(f'Starts with {starts_with}')
+    series.hist()
+
+    ax.axvline(x=rtt, color='r', label='RTT')
+    ax.axvline(x=rtt+10, color='r', label='RTT+10')
+    ax.legend(loc='upper right')
+
+    plt.show()
+
+    return (perc_total, perc_below, perc_higher)
+
+
 def main():
-    root_path_30secs = '/Users/msharabayko/projects/srt/lib-srt-utils/_send_buffer_datasets_12.06.20_30secs/'
+    root_path = '/Users/msharabayko/projects/srt/lib-srt-utils/_send_buffer_datasets_17.06.20_2mins/'
+    algo_dir = root_path + 'periodic_nak/'
+    starts_with = '_rtt20_loss0_sendrate5'
+    sndcsv = '2-srt-xtransmit-stats-snd.csv'
 
-    ### For debugging ###
-    df = load_datasets(root_path_30secs)
-    print(df)
-
-    tmp_df = df.groupby(['rtt', 'loss', 'sendrate', 'algo'])[['snd_buffer_min_timespan', 'snd_buffer_max_timespan', 'snd_buffer_mean_timespan']].agg(confidence_interval)
-    print(tmp_df)
-
-    # TODO: Remove from here aggregation by algos
-    plot_dfs = df.groupby(['rtt', 'loss', 'sendrate', 'algo'])
-    for group_name, group in plot_dfs:
-        print(group_name)
-        print(group)
-        plot_snd_buffer_timespan(group)
-
-
-
-    return
-
-    ### End of debugging ###
-
-    st.title('My first app')
-
-    df = load_datasets(root_path_30secs)
-    st.subheader('Result dataframe, 30 secs datasets')
-    st.write(df)
-
-    st.subheader('Receiver buffer fullness, 30 secs datasets')
-    algs = ['Periodic NAK']
-    # TODO: There is a bug when plotting multiple plots
-    # https://github.com/streamlit/streamlit/issues/1440
-    # Error message: MediaFileManager: Missing file 1c836691489ae0c9bb858e79fd64a7767687f879e06cad7a4eed5cea
-    # plot_rcv_buffer_fullness(df, 20, 0, 10, algs)
-    # plot_rcv_buffer_fullness(df, 20, 4, 10, algs)
-    # plot_rcv_buffer_fullness(df, 20, 8, 10, algs)
+    define_percentage(algo_dir, starts_with, sndcsv)
+    define_percentage(algo_dir, '_rtt20_loss0', sndcsv)
 
 
 if __name__ == '__main__':
