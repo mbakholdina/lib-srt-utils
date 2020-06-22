@@ -28,7 +28,7 @@ import sys
 
 def main():
     # TODO: Command line
-    path = '/Users/msharabayko/projects/srt/lib-srt-utils/_send_buffer_datasets_12.06.20/'
+    path = '/Users/msharabayko/projects/srt/lib-srt-utils/_tmp/'
     subfolders = ['haivision@10.129.128.51', 'haivision@10.129.128.52']
 
     for src_dir, dirs, files in os.walk(path):
