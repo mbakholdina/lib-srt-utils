@@ -195,6 +195,7 @@ def plot_rcv_buffer_fullness(df, rtt, loss, sendrate, algs):
 
 
 def plot_snd_buffer_timespan(df):
+    """ Plot sender buffer timespan. """
     # TODO: Loop through algos
 
     # Calculating prediction
@@ -230,11 +231,24 @@ def plot_snd_buffer_timespan(df):
     plt.show()
 
 
-def confidence_interval(series):
-    return (series.quantile(0.025), series.quantile(0.975))
+def confidence_interval_95(series):
+    """ Return 95% confidence interval for series. """
+    return (
+        round(series.quantile(0.025), 2),
+        round(series.quantile(0.975), 2)
+    )
+
+
+def confidence_interval_99(series):
+    """ Return 99% confidence interval for series. """
+    return (
+        round(series.quantile(0.005), 2),
+        round(series.quantile(0.995), 2)
+    )
 
 
 def define_percentage(algo_dir: str, starts_with: str, sndcsv: str, rtt):
+    """ Define percentage of data out of [RTT, RTT + 10] ms boundaries. """
     series = pd.Series([])
 
     algo_dir = pathlib.Path(algo_dir)
@@ -255,9 +269,13 @@ def define_percentage(algo_dir: str, starts_with: str, sndcsv: str, rtt):
         to_append = to_append.iloc[1:]
         series = series.append(to_append)
 
-    perc_total = round((1 - series.between(rtt, rtt + 10).sum() / series.count()) * 100, 2)
-    perc_below = round(series.between(series.min(), rtt).sum() * 100 / series.count(), 2)
-    perc_higher = perc_total - perc_below
+    # Sort the values and calculate percentage
+    series.sort_values(inplace=True)
+
+    n = series.count()
+    perc_below = series[lambda x: x < rtt].count() * 100 / n
+    perc_higher = series[lambda x: x > rtt + 10].count() * 100 / n
+    perc_total = perc_below + perc_higher
 
     # Plot histogram
     f, ax = plt.subplots()
@@ -270,17 +288,13 @@ def define_percentage(algo_dir: str, starts_with: str, sndcsv: str, rtt):
 
     plt.show()
 
-    return (perc_total, perc_below, perc_higher)
-
-
-def main():
-    root_path = '/Users/msharabayko/projects/srt/lib-srt-utils/_send_buffer_datasets_17.06.20_2mins/'
-    algo_dir = root_path + 'periodic_nak/'
-    starts_with = '_rtt20_loss0_sendrate5'
-    sndcsv = '2-srt-xtransmit-stats-snd.csv'
-
-    define_percentage(algo_dir, starts_with, sndcsv)
-    define_percentage(algo_dir, '_rtt20_loss0', sndcsv)
+    return (
+        round(perc_total, 2),
+        round(perc_below, 2),
+        round(perc_higher, 2),
+        confidence_interval_95(series),
+        confidence_interval_99(series)
+    )
 
 
 if __name__ == '__main__':
