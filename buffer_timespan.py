@@ -199,11 +199,10 @@ def plot_snd_buffer_timespan(df):
     # TODO: Loop through algos
 
     # Calculating prediction
-    df['snd_buffer_min_timespan_predict'] = df['rtt']
-    df['snd_buffer_max_timespan_predict'] = df['rtt'] + 10
+    df['snd_buffer_min_timespan_predict'] = df['actual_rtt']
+    df['snd_buffer_max_timespan_predict'] = df['actual_rtt'] + 10
 
     f, ax = plt.subplots(figsize=(12,6))
-    # f.canvas.set_window_title('Test')
 
     df.plot(x='latencyxrtt', y='snd_buffer_max_timespan', kind="line", linestyle='-', marker='o', ax=ax)
     df.plot(x='latencyxrtt', y='snd_buffer_min_timespan', kind="line", linestyle='-', marker='o', ax=ax)
