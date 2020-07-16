@@ -188,9 +188,11 @@ Note:  `--duration` option of the `srt-xtransmit` application is used to control
 | lolo_xtransmit_live_duration                                 | Local-local setup, `srt-xtransmit` application is used for transmission, live mode, `--duration` option of `srt-xtransmit` is used to control the time of data transmission. **Not implemented.** |
 | [lore_xtransmit_live](#lore_xtransmit_live)                  | Local-remote setup, `srt-xtransmit` application is used for transmission, live mode. |
 | [lore_xtransmit_live_duration](#lore_xtransmit_live_duration) | Local-remote setup, `srt-xtransmit` application is used for transmission, live mode, `--duration` option of `srt-xtransmit` is used to control the time of data transmission. |
-| [rere_xtransmit_live_duration](#rere_xtransmit_live_duration) | Remote-remote setup, `set-xtransmit` application is used for transmission, live mode, `--duration` option of `srt-xtransmit` is used to control the time of data transmission. |
-| TODO: lore_xtransmit_file_duration                           |                                                              |
-| TODO: rere_xtransmit_file_duration                           |                                                              |
+| [rere_xtransmit_live_duration](#rere_xtransmit_live_duration) | Remote-remote setup, `srt-xtransmit` application is used for transmission, live mode, `--duration` option of `srt-xtransmit` is used to control the time of data transmission. |
+| lore_xtransmit_file_duration                                 | **Not implemented.**                                         |
+| rere_xtransmit_file_duration                                 | **Not implemented.**                                         |
+| flip_flop                                                    | Internal config for Flip-Flop test setup, both `tshark` and `srt-xtransmit`. The same steps as for `rere_xtransmit_live_duration` config. |
+| flip_flop_without_tshark                                     | Internal config for Flip-Flop test setup, `srt-xtransmit` only. |
 
 ### Commands to reproduce the experiment
 
