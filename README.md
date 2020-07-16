@@ -145,4 +145,8 @@ As mentioned above, running the tasks is implemented both locally and remotely s
 
 # Executable Scripts
 
-All the implemented scripts can be found in `scripts` folder. Please use [scripts/experiment_runner.py](https://github.com/mbakholdina/lib-srt-utils/blob/master/scripts/experiment_runner.py) script to run a single experiment based on the experiment config.
+All the implemented scripts can be found in `scripts` folder. Please use [scripts/experiment_runner.py](https://github.com/mbakholdina/lib-srt-utils/blob/master/scripts/experiment_runner.py) script to run a single experiment based on the experiment config:
+
+```
+venv/bin/python -m scripts.experiment_runner --resultsdir _experiment_results configs/lore_xtransmit_live.json
+```
