@@ -1,7 +1,3 @@
-"""
-Script designed to run single experiments from config.
-Configs can be found in `../configs` folder.
-"""
 import json
 import logging
 import time
@@ -25,6 +21,11 @@ logger = logging.getLogger(__name__)
     help =  'Directory path to store experiment results.'
 )
 def main(config_path, resultsdir):
+    """
+    Script designed to run a single experiment based on the experiment config.
+    Configs can be found in `./configs` folder.
+    """
+
     logging.basicConfig(
         level=logging.INFO,
         format='%(asctime)-15s [%(levelname)s] %(message)s',
