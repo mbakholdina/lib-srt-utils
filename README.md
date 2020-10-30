@@ -24,16 +24,16 @@ An implementation of the `TestRunner` class responsible for running a single tes
 
 Important to note, that currently only `tshark` and [srt-xtransmit](https://github.com/maxsharabayko/srt-xtransmit) test application are supported. [srt-live-transmit](https://github.com/Haivision/srt/blob/master/docs/srt-live-transmit.md) and other applications can be added by request.
 
-# Getting Started
+## Getting Started
 
-## Requirements
+### Requirements
 
 * python 3.6+
 * tshark, setting up tshark is described in [SRT Cookbook](https://srtlab.github.io/srt-cookbook/apps/wireshark/) and [srt-test-runner documentation](https://github.com/mbakholdina/srt-test-runner)
 * ssh-agent, setting up SSH keys and ssh-agent is described in [SRT Cookbook](https://srtlab.github.io/srt-cookbook/how-to-articles/how-to-work-with-ssh-keys/)
 * [srt-xtransmit](https://github.com/maxsharabayko/srt-xtransmit) test application
 
-## Install the library with pip
+### Install the library with pip
 
 For development, it is recommended 
 * To use `venv` for virtual environments and `pip` for installing the library and any dependencies. This ensures the code and dependencies are isolated from the system Python installation,
@@ -51,7 +51,7 @@ or use preinstalled executable scripts
 venv/bin/script --help
 ```
 
-## Install the library to import in another project
+### Install the library to import in another project
 
 Install with `pip` (a `venv` is recommended), using pip's VCS requirement specifier
 ```
@@ -77,7 +77,7 @@ or a particular module
 import srt_utils.module as module
 ```
 
-## Running the library
+### Running the library
 
 Running unit tests:
 ```
@@ -96,7 +96,7 @@ eval "$(ssh-agent -s)"
 ssh-add -K ~/.ssh/id_rsa
 ```
 
-# Setting Up the Environment
+## Setting Up the Environment
 
 As mentioned above, running the tasks is implemented both locally and remotely so that the following combinations are possible: 
 
@@ -104,7 +104,7 @@ As mentioned above, running the tasks is implemented both locally and remotely s
 - local-remote: the script is running on the local machine, `thark` and SRT receiver are running on the remote machine, another `tshark` and SRT sender are running on the local machine where the script is running, 
 - and remote-remote setup: the script is running on a separate local machine, `thark` and SRT receiver are running on the first remote machine, another `tshark` and SRT sender are running on the second remote machine.
 
-## Supported OSs
+### Supported OSs
 
 - MacOS / Ubuntu / CentOS (local-local)
 
@@ -115,7 +115,7 @@ As mentioned above, running the tasks is implemented both locally and remotely s
 - CentOS / Ubuntu &#8594; MacOS + MacOS / Ubuntu + Ubuntu / CentOS + CentOS (remote-remote) - to be tested 
 - Any combinations with Windows - to be tested, there is no support for Windows implemented.
 
-## Steps to Do before Running the Script
+### Steps to Do before Running the Script
 
 1. Generate SSH key on the machine where the script will be launched and copy it to the remote machines for the script to connect to them and run the tasks via SSH. See the instructions in [SRT Cookbook](https://srtlab.github.io/srt-cookbook/how-to-articles/how-to-work-with-ssh-keys/).
 
@@ -143,10 +143,30 @@ As mentioned above, running the tasks is implemented both locally and remotely s
 
 8. Now you are ready to run the script.
 
-# Executable Scripts
+## Scripts
 
-All the implemented scripts can be found in `scripts` folder. Please use [scripts/experiment_runner.py](https://github.com/mbakholdina/lib-srt-utils/blob/master/scripts/experiment_runner.py) script to run a single experiment based on the experiment config:
+All the implemented scripts can be found in `scripts` folder.
+
+### experiment_runner.py
+
+Please use [scripts/experiment_runner.py](https://github.com/mbakholdina/lib-srt-utils/blob/master/scripts/experiment_runner.py) script to run a single experiment based on the experiment config:
 
 ```
 venv/bin/python -m scripts.experiment_runner --resultsdir _experiment_results configs/lore_xtransmit_live.json
+```
+
+### rename_folders.py
+
+Script-helper designed to move experiment results from subfolders to a root folder corresponding to a particular experiment. Run
+
+```
+venv/bin/python -m scripts.rename_folders --help
+```
+
+to get the full decsription and the list of options.
+
+Example of execution:
+
+```
+venv/bin/python -m scripts.rename_folders _send_buffer_datasets_12.06.20/ --subfolder haivision@10.129.128.51 --subfolder haivision@10.129.128.52
 ```
