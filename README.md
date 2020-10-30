@@ -163,10 +163,4 @@ Script-helper designed to move experiment results from subfolders to a root fold
 venv/bin/python -m scripts.rename_folders --help
 ```
 
-to get the full decsription and the list of options.
-
-Example of execution:
-
-```
-venv/bin/python -m scripts.rename_folders _send_buffer_datasets_12.06.20/ --subfolder haivision@10.129.128.51 --subfolder haivision@10.129.128.52
-```
+to get full decsription, example of execution, and the list of options.
