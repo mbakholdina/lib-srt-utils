@@ -48,8 +48,10 @@ def main(root_folder, subfolder):
     venv/bin/python -m scripts.rename_folders _send_buffer_datasets_12.06.20/
     --subfolder haivision@10.129.128.51 --subfolder haivision@10.129.128.52
     """
-
     for src_dir, dirs, files in os.walk(root_folder):
+        if (not dirs) & (not files):
+            print(f'ERROR: There are no directories or files in {src_dir}')
+
         for fldr in subfolder:
             if src_dir.find(fldr) == -1:
                 continue
@@ -61,13 +63,12 @@ def main(root_folder, subfolder):
                 dst_file = os.path.join(dst_dir, file_)
 
                 if os.path.exists(src_file) == False:
-                    print(f"ERROR source file does not exist {src_file}")
+                    print(f"ERROR: Source file does not exist {src_file}")
                     continue
 
                 if os.path.exists(dst_file):
                     os.remove(dst_file)
 
-                print(f'Move {src_file} to {dst_file}')
                 try:
                     shutil.move(src_file, dst_dir)
                 except:
