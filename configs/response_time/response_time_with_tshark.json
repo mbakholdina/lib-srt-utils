@@ -1,0 +1,146 @@
+{
+    "collect_results_path": "_experiment_results",
+    "stop_after": 130,
+    "ignore_stop_order": true,
+    "tasks": {
+        "1": {
+            "obj_type": "tshark",
+            "obj_config": {
+                "path": "/usr/sbin/dumpcap",
+                "interface": "em2",
+                "port": "4200",
+                "dirpath": "/home/haivision/projects/maria/_results"
+            },
+            "runner_type": "remote-runner",
+            "runner_config": {
+                "username": "haivision",
+                "host": "10.129.10.82"
+            },
+            "sleep_after_start": null,
+            "sleep_after_stop": null,
+            "stop_order": null
+        },
+        "2": {
+            "obj_type": "tshark",
+            "obj_config": {
+                "path": "/usr/sbin/dumpcap",
+                "interface": "enp3s0f1",
+                "port": "4200",
+                "dirpath": "/home/haivision/projects/maria/_results"
+            },
+            "runner_type": "remote-runner",
+            "runner_config": {
+                "username": "haivision",
+                "host": "10.129.10.81"
+            },
+            "sleep_after_start": null,
+            "sleep_after_stop": null,
+            "stop_order": null
+        },
+        "3": {
+            "obj_type": "srt-xtransmit",
+            "obj_config": {
+                "type": "rcv",
+                "path": "/home/haivision/projects/maria/srt-xtransmit-jitter-trace-rsptime/_build/bin/srt-xtransmit",
+                "port": "4200",
+                "attrs_values": [
+                    [
+                        "transtype",
+                        "live"
+                    ],
+                    [
+                        "rcvbuf",
+                        "1000000000"
+                    ],
+                    [
+                        "sndbuf",
+                        "1000000000"
+                    ],
+                    [
+                        "latency",
+                        "400"
+                    ]
+                ],
+                "options_values": [
+                    [
+                        "--msgsize",
+                        "1316"
+                    ]
+                ],
+                "statsdir": "/home/haivision/projects/maria/_results",
+                "statsfreq": "100"
+            },
+            "runner_type": "remote-runner",
+            "runner_config": {
+                "username": "haivision",
+                "host": "10.129.10.82"
+            },
+            "sleep_after_start": null,
+            "sleep_after_stop": null,
+            "stop_order": null
+        },
+        "4": {
+            "obj_type": "srt-xtransmit",
+            "obj_config": {
+                "type": "snd",
+                "path": "/home/haivision/projects/maria/srt-xtransmit-jitter-trace-rsptime/_build/bin/srt-xtransmit",
+                "port": "4200",
+                "host": "192.168.2.2",
+                "attrs_values": [
+                    [
+                        "transtype",
+                        "live"
+                    ],
+                    [
+                        "rcvbuf",
+                        "1000000000"
+                    ],
+                    [
+                        "sndbuf",
+                        "1000000000"
+                    ],
+                    [
+                        "latency",
+                        "400"
+                    ],
+                    [
+                        "maxbw",
+                        "0"
+                    ],
+                    [
+                        "inputbw",
+                        "0"
+                    ],
+                    [
+                        "retransmitalgo",
+                        "0"
+                    ]
+                ],
+                "options_values": [
+                    [
+                        "--msgsize",
+                        "1316"
+                    ],
+                    [
+                        "--sendrate",
+                        "500kbps"
+                    ],
+                    [
+                        "--duration",
+                        "120"
+                    ]
+                ],
+                "statsdir": "/home/haivision/projects/maria/_results",
+                "statsfreq": "100"
+            },
+            "runner_type": "remote-runner",
+            "runner_config": {
+                "username": "haivision",
+                "host": "10.129.10.81"
+            },
+            "sleep_after_start": null,
+            "sleep_after_stop": null,
+            "stop_order": null
+        }
+    }
+}

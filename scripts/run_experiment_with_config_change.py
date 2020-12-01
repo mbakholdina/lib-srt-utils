@@ -48,14 +48,14 @@ def main(config_path, resultsdir, latency, sendrate):
         config['collect_results_path'] = resultsdir
 
     if latency is not None:
-        config['tasks']['1']['obj_config']['attrs_values'][3] = ["latency", latency]
-        config['tasks']['2']['obj_config']['attrs_values'][3] = ["latency", latency]
-        print(config['tasks']['1']['obj_config']['attrs_values'])
-        print(config['tasks']['2']['obj_config']['attrs_values'])
+        config['tasks']['3']['obj_config']['attrs_values'][3] = ["latency", latency]
+        config['tasks']['4']['obj_config']['attrs_values'][3] = ["latency", latency]
+        print(config['tasks']['3']['obj_config']['attrs_values'])
+        print(config['tasks']['4']['obj_config']['attrs_values'])
 
     if sendrate is not None:
-        config['tasks']['2']['obj_config']['options_values'][1] = ["--sendrate", sendrate]
-        print(config['tasks']['2']['obj_config']['options_values'])
+        config['tasks']['4']['obj_config']['options_values'][1] = ["--sendrate", sendrate]
+        print(config['tasks']['4']['obj_config']['options_values'])
 
     try:
         exp_runner = SingleExperimentRunner.from_config(config)
