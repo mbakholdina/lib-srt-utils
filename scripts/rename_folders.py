@@ -74,8 +74,8 @@ def main(root_folder, subfolder):
                 except:
                     pass
 
-                if os.path.exists(src_dir):
-                    os.rmdir(src_dir)
+            if os.path.exists(src_dir):
+                os.rmdir(src_dir)
 
 
 if __name__ == '__main__':
