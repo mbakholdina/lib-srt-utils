@@ -5,7 +5,7 @@ date=01.12.20
 
 # Set transfer rate (Mbps), RTT (ms), packet loss (percentage) - required
 transfer_rate=45
-RTT=100
+RTT=1000
 lossA=0
 lossB=0
 
@@ -32,11 +32,9 @@ echo "Config: $config"
 echo "Test results can be found here: $resultsdir"
 echo ""
 
-latency=`expr $RTT \* 4`
-echo "Latency: $latency ms"
-
 sleep 5
 
+latency=`expr $RTT \* 4`
 for sendrate in 500kbps 10Mbps
   do
     echo "Sendrate: $sendrate, Latency: $latency ms"
