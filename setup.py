@@ -5,7 +5,7 @@ from setuptools import setup, find_packages
 install_requires = [
     'attrs',
     'click >=7.0,<8.0',
-    'fabric',
+    'fabric <= 2.5.0',
     'paramiko',
     'patchwork'
 ]
