@@ -44,19 +44,19 @@ def before_collect_results_checks(
     collect_results_path: pathlib.Path
 ):
     """
-    Helper function which performs prelimenary checks for `LocalRunner` and
-    `RemoteRunner` classes before collecting object results.
+    Helper function which performs preliminary checks for `LocalRunner` and
+    `RemoteRunner` classes before collecting object artifacts.
     """
     if not process.is_started:
         raise SrtUtilsException(
             f'Process has not been started yet: {obj}. '
-            'Can not collect results'
+            'Can not collect artifacts'
         )
 
     if not process.is_stopped:
         raise SrtUtilsException(
             f'Process has not been stopped yet: {obj}, {process}. '
-            'Can not collect results'
+            'Can not collect artifacts'
         )
 
     # It's expected that at this moment directory 
@@ -64,8 +64,8 @@ def before_collect_results_checks(
     # in SingleExperimentRunner class
     if not collect_results_path.exists():
         raise SrtUtilsException(
-            'There was no directory for collecting results created: '
-            f'{collect_results_path}. Can not collect results'
+            'There was no directory for collecting experiment results created: '
+            f'{collect_results_path}. Can not collect artifacts'
         )
 
 
@@ -190,16 +190,11 @@ class LocalRunner(IObjectRunner):
                 `pathlib.Path` directory path.
         """
         logger.info(
-            '[LocalRunner] Creating a local directory for saving object '
-            f'results: {dirpath}'
+            '[LocalRunner] Creating local directory for saving object '
+            f'artifacts: {dirpath}'
         )
 
-        created = create_local_directory(dirpath)
-        # if not created:
-        #     logger.info(
-        #         '[LocalRunner] Directory already exists, no need to '
-        #         f'create: {dirpath}'
-        #     )
+        _ = create_local_directory(dirpath)
 
 
     @classmethod
@@ -220,8 +215,8 @@ class LocalRunner(IObjectRunner):
         logger.info(f'Starting object on-premises: {self.obj}')
         logger.info(f'Arguments for LocalRunner: {self.obj.make_args()}')
 
-        if self.obj.dirpath is not None:
-            self._create_directory(self.obj.dirpath)
+        for filepath in self.obj.artifacts:
+            self._create_directory(filepath.parent)
 
         self.process.start()
 
@@ -233,11 +228,11 @@ class LocalRunner(IObjectRunner):
 
     def collect_results(self):
         """
-        Before collecting object results, this function creates a local 
+        Before collecting object artifacts, this function creates a local 
         directory `local` inside self.collect_results_path directory
         where the results produced by the object are copied.
         """
-        logger.info(f'Collecting object results: {self.obj}, {self.process}')
+        logger.info(f'Collecting object artifacts: {self.obj}, {self.process}')
 
         before_collect_results_checks(
             self.obj,
@@ -245,62 +240,54 @@ class LocalRunner(IObjectRunner):
             self.collect_results_path
         )
 
-        # If an object has filepath equal to None, it means there should be
-        # no output file produced
-        if self.obj.filepath is None:
-            logger.info('There was no output file expected, nothing to collect')
+        if self.obj.artifacts is []:
+            logger.info('There were no artifacts expected, nothing to collect')
             return
-
-        # If an object has filepath defined, it means there should be 
-        # an output file produced. However it does not mean that the file
-        # was created successfully, that's why we check whether the filepath exists.
-        if not self.obj.filepath.exists():
-            stdout, stderr = self.process.collect_results()
-            raise SrtUtilsException(
-                'There was no output file produced by the object: '
-                f'{self.obj}, nothing to collect. Process stdout: '
-                f'{stdout}. Process stderr: {stderr}'
-            )
 
         # Create 'local' folder to copy produced by the object file 
         # (inside self.collect_results_path directory)
         destination_dir = self.collect_results_path / 'local'
         logger.info(
-            'Creating a local directory for copying object results: '
+            'Creating local directory for saving object artifacts: '
             f'{destination_dir}'
         )
-        created = create_local_directory(destination_dir)
-        # if not created:
-        #     logger.info(
-        #         'Directory already exists, no need to create: '
-        #         f'{destination_dir}'
-        #     )
+        _ = create_local_directory(destination_dir)
 
         # The code below will raise a FileExistsError if destination already exists. 
         # Technically, this copies a file. To perform a move, simply delete source 
         # after the copy is done. Make sure no exception was raised though.
 
-        # In case we have several tasks which is runned locally by 
+        # In case we have several tasks which are run locally by 
         # LocalRunner runner and in case the tasks have the same names 
         # for the output files, the result might be overwritten. 
         # That's why we do not delete destination file before, instead
         # we catch FileExistsError exception. That's why it is necessary 
         # to make sure that the file names for different tasks are unique.
-        logger.info(f'Copying object results into: {destination_dir}')
 
-        filename = self.obj.filepath.name
-        source = self.obj.filepath
-        destination = destination_dir / filename
+        for filepath in self.obj.artifacts:
+            logger.info(f'Saving file: {filepath} into: {destination_dir}')
 
-        try:
-            with destination.open(mode='xb') as fid:
-                fid.write(source.read_bytes())
-        except FileExistsError:
-            raise SrtUtilsException(
-                'The destination file already exists, there might be a '
-                f'file created by the other object: {destination}. File '
-                f'with object results was not copied: {self.obj.filepath}'
-            )
+            # Check if the file exists on a local machine
+            if not filepath.exists():
+                stdout, stderr = self.process.collect_results()
+                logger.warning(
+                    f'File {filepath} was not created by the object: '
+                    f'{self.obj}, nothing to collect. Process stdout: '
+                    f'{stdout}. Process stderr: {stderr}'
+                )
+                continue
+
+            destination = destination_dir / filepath.name
+
+            try:
+                with destination.open(mode='xb') as fid:
+                    fid.write(filepath.read_bytes())
+            except FileExistsError:
+                logger.error(
+                    'The destination file already exists, there might be a '
+                    f'file created by another object: {destination}. File '
+                    f'with object results was not copied: {filepath}'
+                )
 
         # TODO: (?) Delete source file, might be an option, but not necessary at the start
 
@@ -322,7 +309,7 @@ class RemoteRunner(IObjectRunner):
             obj:
                 `IObject` object to run.
             username:
-                Username on the remote machine to connect througth.
+                Username on the remote machine to connect through.
             host:
                 IP address of the remote machine to connect.
             collect_results_path:
@@ -362,7 +349,7 @@ class RemoteRunner(IObjectRunner):
             dirpath:
                 `pathlib.Path` directory path.
             username:
-                Username on the remote machine to connect througth.
+                Username on the remote machine to connect through.
             host:
                 IP address of the remote machine to connect.
 
@@ -370,7 +357,7 @@ class RemoteRunner(IObjectRunner):
             SrtUtilsException
         """
         logger.info(
-            '[RemoteRunner] Creating a directory for saving object results '
+            '[RemoteRunner] Creating directory for saving object artifacts '
             f'remotely via SSH. Username: {username}, host: {host}, '
             f'dirpath: {dirpath}'
         )
@@ -385,20 +372,20 @@ class RemoteRunner(IObjectRunner):
                 result = c.run(f'mkdir -p {dirpath}')
         except paramiko.ssh_exception.SSHException as error:
             raise SrtUtilsException(
-                f'Directory has not been created: {dirpath}. Exception '
-                f'occured ({error.__class__.__name__}): {error}. Check that '
+                f'Directory was not created: {dirpath}. Exception '
+                f'occurred ({error.__class__.__name__}): {error}. Check that '
                 'ssh-agent has been started before running the script'
             )
         except TimeoutError as error:
             raise SrtUtilsException(
-                f'Directory has not been created: {dirpath}. Exception '
-                f'occured ({error.__class__.__name__}): {error}. Check that '
+                f'Directory was not created: {dirpath}. Exception '
+                f'occurred ({error.__class__.__name__}): {error}. Check that '
                 'IP address of the remote machine is correct and the '
                 'machine is not down'
             )
 
         if result.exited != 0:
-            raise SrtUtilsException(f'Directory has not been created: {dirpath}')
+            raise SrtUtilsException(f'Directory was not created: {dirpath}')
 
 
     @classmethod
@@ -407,7 +394,7 @@ class RemoteRunner(IObjectRunner):
         Config Example:
             config = {
                 'username': 'msharabayko',
-                'host': '137.135.161.223',
+                'host': '10.129.10.91',
                 'collect_results_path': '_results_exp'      # optional
             }
         """
@@ -426,9 +413,9 @@ class RemoteRunner(IObjectRunner):
         logger.info(f'Starting object remotely via SSH: {self.obj}')
         logger.info(f'Arguments for RemoteRunner: {self.args}')
 
-        if self.obj.dirpath is not None:
+        for filepath in self.obj.artifacts:
             self._create_directory(
-                self.obj.dirpath,
+                filepath.parent,
                 self.username,
                 self.host
             )
@@ -443,11 +430,11 @@ class RemoteRunner(IObjectRunner):
 
     def collect_results(self):
         """
-        Before collecting object results, this function creates a local 
+        Before collecting object artifacts, this function creates a local 
         directory `username@host` inside self.collect_results_path directory
         where the results produced by the object are copied.
         """
-        logger.info(f'Collecting object results: {self.obj}, {self.process}')
+        logger.info(f'Collecting object artifacts: {self.obj}, {self.process}')
 
         before_collect_results_checks(
             self.obj,
@@ -455,63 +442,59 @@ class RemoteRunner(IObjectRunner):
             self.collect_results_path
         )
 
-        # If an object has filepath equal to None, it means there should be
-        # no output file produced
-        if self.obj.filepath is None:
-            logger.info('There was no output file expected, nothing to collect')
+        if self.obj.artifacts is []:
+            logger.info('There were no artifacts expected, nothing to collect')
             return
 
-        # If an object has filepath defined, it means there should be 
-        # an output file produced. However it does not mean that the file
-        # was created successfully, that's why we check whether the filepath exists.
-        with fabric.Connection(host=self.host, user=self.username) as c:
-            if not exists(c, self.obj.filepath):
-                stdout, stderr = self.process.collect_results()
-                raise SrtUtilsException(
-                    'There was no output file produced by the object: '
-                    f'{self.obj}, nothing to collect. Process stdout: '
-                    f'{stdout}. Process stderr: {stderr}'
-                )
-
-        # Create 'username@host' folder to copy produced by the object file 
+        # Create 'username@host' folder to copy produced by the object files
         # (inside self.collect_results_path directory)
         destination_dir = self.collect_results_path / f'{self.username}@{self.host}'
         logger.info(
-            'Creating a local directory for copying object results: '
+            'Creating local directory for saving object artifacts: '
             f'{destination_dir}'
         )
-        created = create_local_directory(destination_dir)
-        # if not created:
-        #     logger.info(
-        #         'Directory already exists, no need to create: '
-        #         f'{destination_dir}'
-        #     )
+        _ = create_local_directory(destination_dir)
 
-        logger.info(f'Copying object results into: {destination_dir}')
-        filename = self.obj.filepath.name
-        source = self.obj.filepath
-        destination = destination_dir / filename
+        logger.info(f'Saving object artifacts into: {destination_dir}')
 
-        if destination.exists():
-            raise SrtUtilsException(
-                'The destination file already exists, there might be a '
-                f'file created by the other object: {destination}. File '
-                f'with object results was not copied: {self.obj.filepath}'
-            )
+        for filepath in self.obj.artifacts:
+            logger.info(f'Saving file: {filepath}')
 
-        # TODO: Implement copying files using rsync
-        try:
-            # http://docs.fabfile.org/en/2.3/api/transfer.html
+            # Check if the file exists on a remote machine
             with fabric.Connection(host=self.host, user=self.username) as c:
-                result = c.get(source, destination)
-        except OSError as error:
-            raise SrtUtilsException(
-                f'Object results have not been collected: {self.obj.filepath}'
-                f'. Exception occured ({error.__class__.__name__}): {error}. '
-            )
-        except Exception as error:
-            logger.info('Most probably paramiko exception')
-            raise SrtUtilsException(
-                f'Object results have not been collected: {self.obj.filepath}'
-                f'. Exception occured ({error.__class__.__name__}): {error}. '
-            )
+                if not exists(c, filepath):
+                    stdout, stderr = self.process.collect_results()
+                    logger.warning(
+                        f'File {filepath} was not created by the object: '
+                        f'{self.obj}, nothing to collect. Process stdout: '
+                        f'{stdout}. Process stderr: {stderr}'
+                    )
+                    continue
+
+            # Check if there is no file with the same name on the local machine
+            destination = destination_dir / filepath.name
+
+            if destination.exists():
+                logger.warning(
+                    'A file with the same name already exists. This might be a '
+                    f'file created by another object: {destination}. File '
+                    f'with object results was not copied: {filepath}'
+                )
+                continue
+
+            # TODO: Implement copying files using rsync
+            try:
+                # http://docs.fabfile.org/en/2.3/api/transfer.html
+                with fabric.Connection(host=self.host, user=self.username) as c:
+                    _ = c.get(filepath, destination)
+            except OSError as error:
+                logger.error(
+                    f'File {filepath} was not saved. '
+                    f'Exception occurred ({error.__class__.__name__}): {error}. '
+                )
+            except Exception as error:
+                logger.error('Most probably paramiko exception')
+                logger.error(
+                    f'File {filepath} was not saved. '
+                    f'Exception occurred ({error.__class__.__name__}): {error}. '
+                )

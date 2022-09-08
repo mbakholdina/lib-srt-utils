@@ -7,7 +7,7 @@ from srt_utils.exceptions import SrtUtilsException
 
 def create_local_directory(dirpath: pathlib.Path):
     """
-    Helper function used to create the directory locally.
+    Helper function used to create a directory locally.
 
     Attributes:
         dirpath:
@@ -21,7 +21,7 @@ def create_local_directory(dirpath: pathlib.Path):
         dirpath.mkdir(parents=True)
     except Exception as error:
         raise SrtUtilsException(
-            f'Directory has not been created: {dirpath}. Exception '
+            f'Directory was not created: {dirpath}. Exception '
             f'occured ({error.__class__.__name__}): {error}'
         )
 
