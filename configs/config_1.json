@@ -1,0 +1,65 @@
+{
+    "collect_results_path": "_results",
+    "stop_after": 70,
+    "ignore_stop_order": true,
+    "tasks": {
+        "1": {
+            "obj_type": "srt-xtransmit",
+            "obj_config": {
+                "type": "rcv",
+                "path": "/home/haivision/projects/maria/srt-xtransmit/_build/bin/srt-xtransmit",
+                "port": "4200",
+                "attrs_values": {
+                    "rcvbuf": "1000000000",
+                    "sndbuf": "1000000000",
+                    "latency": "400"
+                },
+                "options_values": {
+                    "--msgsize": "1316",
+                    "--statsfile": "/home/haivision/projects/maria/_tmp/rcv-srt-stats.csv",
+                    "--statsfreq": "1s",
+                    "--enable-metrics": null,
+                    "--metricsfile": "/home/haivision/projects/maria/_tmp/rcv-srt-metrics.csv"
+                }
+            },
+            "runner_type": "remote-runner",
+            "runner_config": {
+                "username": "haivision",
+                "host": "10.129.10.92"
+            },
+            "sleep_after_start": null,
+            "sleep_after_stop": null,
+            "stop_order": null
+        },
+        "2": {
+            "obj_type": "srt-xtransmit",
+            "obj_config": {
+                "type": "snd",
+                "path": "/home/haivision/projects/maria/srt-xtransmit/_build/bin/srt-xtransmit",
+                "port": "4200",
+                "host": "192.168.3.2",
+                "attrs_values": {
+                    "rcvbuf": "1000000000",
+                    "sndbuf": "1000000000",
+                    "latency": "400"
+                },
+                "options_values": {
+                    "--msgsize": "1316",
+                    "--sendrate": "10Mbps",
+                    "--duration": "60",
+                    "--statsfile": "/home/haivision/projects/maria/_tmp/snd-srt-stats.csv",
+                    "--statsfreq": "1s",
+                    "--enable-metrics": null
+                }
+            },
+            "runner_type": "remote-runner",
+            "runner_config": {
+                "username": "haivision",
+                "host": "10.129.10.91"
+            },
+            "sleep_after_start": null,
+            "sleep_after_stop": null,
+            "stop_order": null
+        }
+    }
+}

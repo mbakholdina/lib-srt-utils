@@ -59,11 +59,11 @@ class Task:
         Class to store task details.
 
         Task represents one step of a single experiment and contains
-        both the information regarding the object to run and the way to
-        run this object (object runner) as well as additional information
-        like the sleep after start/stop time, stop order if defined, etc.
-        
-        Task should be treated as a combination
+        information 1) about an object (srt-xtransmit, tshark, etc.) and a way
+        to run it (on a remote machine or locally, in particular which object)
+        runner to use; 2) like time to sleep after object start/stop,
+        stop order if defined, etc.
+
         Attributes:
             key:
                 Task key.
@@ -75,19 +75,17 @@ class Task:
                 Task config.
 
         Config Example:
-        config = { 
-            'obj_config': {
-                'filepath': '_results_local/dump1.pcapng',
-                'interface': 'en0',
-                'port': 4200
+        {
+            "obj_type": "srt-xtransmit",
+            "obj_config": {...}                 # See respective object config example
             },
-            'obj_type': 'tshark',
-            'runner_config': {},
-            'runner_type': 'subprocess',
-            'sleep_after_start': 3,             # optional
-            'sleep_after_stop': 3,              # optional
-            'stop_order': 1                     # optional
-        }
+            "runner_type": "local-runner",
+            "runner_config": {},
+            "sleep_after_start": 3,             # Optional
+            "sleep_after_stop": 3,              # Optional
+            "stop_order": 1                     # Optional
+        },
+
         """
         self.key = key
         self.obj = obj
@@ -152,13 +150,13 @@ class SingleExperimentRunner:
     @staticmethod
     def _create_directory(dirpath: pathlib.Path):
         """
-        Create a local directory for saving experiment results.
+        Create local directory for saving experiment results.
 
         Raises:
             SrtUtilsException
         """
         logger.info(
-            '[SingleExperimentRunner] Creating a local directory for saving '
+            '[SingleExperimentRunner] Creating local directory for saving '
             f'experiment results: {dirpath}'
         )
 
